@@ -166,7 +166,12 @@ func StartApiServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.DB, j
 		grpc.WithStatsHandler(&ocgrpc.ClientHandler{}),
 	}
 	if config.GetSocket().TLSCert != nil {
-		dialOpts = append(dialOpts, grpc.WithTransportCredentials(credentials.NewServerTLSFromCert(&config.GetSocket().TLSCert[0])))
+		transportCredentials := credentials.NewTLS(&tls.Config{
+			Certificates: []tls.Certificate{config.GetSocket().TLSCert[0]},
+			// Client used for loopback only.
+			InsecureSkipVerify: true,
+		})
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(transportCredentials))
 	} else {
 		dialOpts = append(dialOpts, grpc.WithInsecure())
 	}
