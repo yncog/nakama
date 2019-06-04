@@ -159,6 +159,8 @@ func StartApiServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.DB, j
 	dialAddr := fmt.Sprintf("127.0.0.1:%d", config.GetSocket().Port-1)
 	if config.GetSocket().Address != "" {
 		dialAddr = fmt.Sprintf("%v:%d", config.GetSocket().Address, config.GetSocket().Port-1)
+	} else if config.GetSocket().TLSCert != nil {
+		dialAddr = fmt.Sprintf("localhost:%d", config.GetSocket().Port-1)
 	}
 	dialOpts := []grpc.DialOption{
 		//TODO (mo, zyro): Do we need to pass the statsHandler here as well?
