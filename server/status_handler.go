@@ -16,7 +16,7 @@ package server
 
 import (
 	"context"
-	"github.com/heroiclabs/nakama/console"
+	"github.com/heroiclabs/nakama/v2/console"
 	"go.uber.org/zap"
 	"runtime"
 )
@@ -47,7 +47,7 @@ func NewLocalStatusHandler(logger *zap.Logger, sessionRegistry SessionRegistry, 
 
 func (s *LocalStatusHandler) GetStatus(ctx context.Context) ([]*console.StatusList_Status, error) {
 	return []*console.StatusList_Status{
-		&console.StatusList_Status{
+		{
 			Name:           s.node,
 			Health:         0,
 			SessionCount:   int32(s.sessionRegistry.Count()),

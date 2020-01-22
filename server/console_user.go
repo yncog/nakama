@@ -21,8 +21,8 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/heroiclabs/nakama/api"
-	"github.com/heroiclabs/nakama/console"
+	"github.com/heroiclabs/nakama-common/api"
+	"github.com/heroiclabs/nakama/v2/console"
 	"github.com/jackc/pgx/pgtype"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -104,7 +104,7 @@ func (s *ConsoleServer) ListUsers(ctx context.Context, in *console.ListUsersRequ
 
 			return &console.UserList{
 				Users: []*api.User{
-					&api.User{
+					{
 						Id:         in.Filter,
 						UpdateTime: &timestamp.Timestamp{Seconds: createTime.Time.Unix()},
 					},

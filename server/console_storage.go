@@ -15,13 +15,14 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"github.com/gofrs/uuid"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/heroiclabs/nakama/api"
-	"github.com/heroiclabs/nakama/console"
+	"github.com/heroiclabs/nakama-common/api"
+	"github.com/heroiclabs/nakama/v2/console"
 	"github.com/jackc/pgx/pgtype"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -31,7 +32,7 @@ import (
 )
 
 func (s *ConsoleServer) DeleteStorage(ctx context.Context, in *empty.Empty) (*empty.Empty, error) {
-	_, err := s.db.Exec("TRUNCATE TABLE storage")
+	_, err := s.db.ExecContext(ctx, "TRUNCATE TABLE storage")
 	if err != nil {
 		s.logger.Error("Failed to truncate Storage table.", zap.Error(err))
 		return nil, status.Error(codes.Internal, "An error occurred while deleting storage objects.")
@@ -176,8 +177,7 @@ func (s *ConsoleServer) WriteStorageObject(ctx context.Context, in *console.Writ
 		}
 	}
 
-	var maybeJSON map[string]interface{}
-	if json.Unmarshal([]byte(in.Value), &maybeJSON) != nil {
+	if maybeJSON := []byte(in.Value); !json.Valid(maybeJSON) || bytes.TrimSpace(maybeJSON)[0] != byteBracket {
 		return nil, status.Error(codes.InvalidArgument, "Requires a valid JSON object value.")
 	}
 

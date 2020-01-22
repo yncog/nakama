@@ -15,17 +15,19 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/crypto/bcrypt"
 	"strconv"
 	"strings"
 
 	"github.com/gofrs/uuid"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/heroiclabs/nakama/api"
-	"github.com/heroiclabs/nakama/console"
+	"github.com/heroiclabs/nakama-common/api"
+	"github.com/heroiclabs/nakama/v2/console"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
@@ -76,7 +78,7 @@ func (s *ConsoleServer) DeleteGroupUser(ctx context.Context, in *console.DeleteG
 		return nil, status.Error(codes.InvalidArgument, "Requires a valid group ID.")
 	}
 
-	if err = KickGroupUsers(ctx, s.logger, s.db, uuid.Nil, groupID, []uuid.UUID{userID}); err != nil {
+	if err = KickGroupUsers(ctx, s.logger, s.db, s.router, uuid.Nil, groupID, []uuid.UUID{userID}); err != nil {
 		// Error already logged in function above.
 		return nil, status.Error(codes.Internal, "An error occurred while trying to remove the user from the group.")
 	}
@@ -112,100 +114,10 @@ func (s *ConsoleServer) ExportAccount(ctx context.Context, in *console.AccountId
 		return nil, status.Error(codes.InvalidArgument, "Cannot export the system user.")
 	}
 
-	// Core user account.
-	account, _, err := GetAccount(ctx, s.logger, s.db, nil, userID)
+	export, err := ExportAccount(ctx, s.logger, s.db, userID)
 	if err != nil {
-		if err == ErrAccountNotFound {
-			return nil, status.Error(codes.NotFound, "Account not found.")
-		}
-		s.logger.Error("Could not export account data", zap.Error(err), zap.String("user_id", in.Id))
-		return nil, status.Error(codes.Internal, "An error occurred while trying to export user data.")
+		return nil, err
 	}
-
-	// Friends.
-	friends, err := GetFriendIDs(ctx, s.logger, s.db, userID)
-	if err != nil {
-		s.logger.Error("Could not fetch friend IDs", zap.Error(err), zap.String("user_id", in.Id))
-		return nil, status.Error(codes.Internal, "An error occurred while trying to export user data.")
-	}
-
-	// Messages.
-	messages, err := GetChannelMessages(ctx, s.logger, s.db, userID)
-	if err != nil {
-		s.logger.Error("Could not fetch messages", zap.Error(err), zap.String("user_id", in.Id))
-		return nil, status.Error(codes.Internal, "An error occurred while trying to export user data.")
-	}
-
-	// Leaderboard records.
-	leaderboardRecords, err := LeaderboardRecordReadAll(ctx, s.logger, s.db, userID)
-	if err != nil {
-		s.logger.Error("Could not fetch leaderboard records", zap.Error(err), zap.String("user_id", in.Id))
-		return nil, status.Error(codes.Internal, "An error occurred while trying to export user data.")
-	}
-
-	groups := make([]*api.Group, 0)
-	groupUsers, err := ListUserGroups(ctx, s.logger, s.db, userID, 0, nil, "")
-	if err != nil {
-		s.logger.Error("Could not fetch groups that belong to the user", zap.Error(err), zap.String("user_id", in.Id))
-		return nil, status.Error(codes.Internal, "An error occurred while trying to export user data.")
-	}
-	for _, g := range groupUsers.UserGroups {
-		groups = append(groups, g.Group)
-	}
-
-	// Notifications.
-	notifications, err := NotificationList(ctx, s.logger, s.db, userID, 0, "", nil)
-	if err != nil {
-		s.logger.Error("Could not fetch notifications", zap.Error(err), zap.String("user_id", in.Id))
-		return nil, status.Error(codes.Internal, "An error occurred while trying to export user data.")
-	}
-
-	// Storage objects where user is the owner.
-	storageObjects, err := StorageReadAllUserObjects(ctx, s.logger, s.db, userID)
-	if err != nil {
-		s.logger.Error("Could not fetch notifications", zap.Error(err), zap.String("user_id", in.Id))
-		return nil, status.Error(codes.Internal, "An error occurred while trying to export user data.")
-	}
-
-	// History of user's wallet.
-	walletLedgers, err := ListWalletLedger(ctx, s.logger, s.db, userID)
-	if err != nil {
-		s.logger.Error("Could not fetch wallet ledger items", zap.Error(err), zap.String("user_id", in.Id))
-		return nil, status.Error(codes.Internal, "An error occurred while trying to export user data.")
-	}
-	wl := make([]*console.WalletLedger, len(walletLedgers))
-	for i, w := range walletLedgers {
-		changeset, err := json.Marshal(w.Changeset)
-		if err != nil {
-			s.logger.Error("Could not fetch wallet ledger items, error encoding changeset", zap.Error(err), zap.String("user_id", in.Id))
-			return nil, status.Error(codes.Internal, "An error occurred while trying to export user data.")
-		}
-		metadata, err := json.Marshal(w.Metadata)
-		if err != nil {
-			s.logger.Error("Could not fetch wallet ledger items, error encoding metadata", zap.Error(err), zap.String("user_id", in.Id))
-			return nil, status.Error(codes.Internal, "An error occurred while trying to export user data.")
-		}
-		wl[i] = &console.WalletLedger{
-			Id:         w.ID,
-			UserId:     w.UserID,
-			Changeset:  string(changeset),
-			Metadata:   string(metadata),
-			CreateTime: &timestamp.Timestamp{Seconds: w.CreateTime},
-			UpdateTime: &timestamp.Timestamp{Seconds: w.UpdateTime},
-		}
-	}
-
-	export := &console.AccountExport{
-		Account:            account,
-		Objects:            storageObjects,
-		Friends:            friends.GetFriends(),
-		Messages:           messages,
-		Groups:             groups,
-		LeaderboardRecords: leaderboardRecords,
-		Notifications:      notifications.GetNotifications(),
-		WalletLedgers:      wl,
-	}
-
 	return export, nil
 }
 
@@ -238,7 +150,7 @@ func (s *ConsoleServer) GetFriends(ctx context.Context, in *console.AccountId) (
 		return nil, status.Error(codes.InvalidArgument, "Requires a valid user ID.")
 	}
 
-	friends, err := GetFriends(ctx, s.logger, s.db, s.tracker, userID, 0, nil, "")
+	friends, err := ListFriends(ctx, s.logger, s.db, s.tracker, userID, 0, nil, "")
 	if err != nil {
 		// Error already logged in function above.
 		return nil, status.Error(codes.Internal, "An error occurred while trying to list the user's friends.")
@@ -268,7 +180,7 @@ func (s *ConsoleServer) GetWalletLedger(ctx context.Context, in *console.Account
 		return nil, status.Error(codes.InvalidArgument, "Requires a valid user ID.")
 	}
 
-	ledger, err := ListWalletLedger(ctx, s.logger, s.db, userID)
+	ledger, _, err := ListWalletLedger(ctx, s.logger, s.db, userID, nil, "")
 	if err != nil {
 		// Error already logged in function above.
 		return nil, status.Error(codes.Internal, "An error occurred while trying to list the user's wallet ledger.")
@@ -333,8 +245,7 @@ func (s *ConsoleServer) UpdateAccount(ctx context.Context, in *console.UpdateAcc
 	}
 
 	if v := in.Metadata; v != nil && v.Value != "" {
-		var metadataMap map[string]interface{}
-		if err := json.Unmarshal([]byte(v.Value), &metadataMap); err != nil {
+		if maybeJSON := []byte(v.Value); !json.Valid(maybeJSON) || bytes.TrimSpace(maybeJSON)[0] != byteBracket {
 			return nil, status.Error(codes.InvalidArgument, "Metadata must be a valid JSON object.")
 		}
 		params = append(params, v.Value)
@@ -377,10 +288,10 @@ func (s *ConsoleServer) UpdateAccount(ctx context.Context, in *console.UpdateAcc
 		}
 	}
 
-	var removeCustomId bool
+	var removeCustomID bool
 	if v := in.CustomId; v != nil {
 		if c := v.Value; c == "" {
-			removeCustomId = true
+			removeCustomID = true
 		} else {
 			if invalidCharsRegex.MatchString(c) {
 				return nil, status.Error(codes.InvalidArgument, "Custom ID invalid, no spaces or control characters allowed.")
@@ -409,6 +320,20 @@ func (s *ConsoleServer) UpdateAccount(ctx context.Context, in *console.UpdateAcc
 				statements = append(statements, "email = $"+strconv.Itoa(len(params)))
 			}
 		}
+	}
+
+	var newPassword string
+	if v := in.Password; v != nil {
+		p := v.Value
+		if len(p) < 8 {
+			return nil, status.Error(codes.InvalidArgument, "Password must be at least 8 characters long.")
+		}
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(p), bcrypt.DefaultCost)
+		if err != nil {
+			s.logger.Error("Error hashing password.", zap.Error(err))
+			return nil, status.Error(codes.Internal, "Error updating user account password.")
+		}
+		newPassword = string(hashedPassword)
 	}
 
 	if v := in.Wallet; v != nil && v.Value != "" {
@@ -440,7 +365,7 @@ func (s *ConsoleServer) UpdateAccount(ctx context.Context, in *console.UpdateAcc
 		}
 	}
 
-	if len(statements) == 0 && !removeCustomId && !removeEmail && len(in.DeviceIds) == 0 {
+	if len(statements) == 0 && !removeCustomID && !removeEmail && len(in.DeviceIds) == 0 {
 		// Nothing to update.
 		return &empty.Empty{}, nil
 	}
@@ -494,7 +419,7 @@ AND (EXISTS (SELECT id FROM users WHERE id = $1 AND
 			}
 		}
 
-		if removeCustomId && removeEmail {
+		if removeCustomID && removeEmail {
 			query := `UPDATE users SET custom_id = NULL, email = NULL, update_time = now()
 WHERE id = $1
 AND ((facebook_id IS NOT NULL
@@ -511,7 +436,7 @@ AND ((facebook_id IS NOT NULL
 			if rowsAffected, _ := res.RowsAffected(); rowsAffected == 0 {
 				return StatusError(codes.InvalidArgument, "Cannot unlink both custom ID and email address when there are no other identifiers.", ErrRowsAffectedCount)
 			}
-		} else if removeCustomId {
+		} else if removeCustomID {
 			query := `UPDATE users SET custom_id = NULL, update_time = now()
 WHERE id = $1
 AND ((facebook_id IS NOT NULL
@@ -549,7 +474,19 @@ AND ((facebook_id IS NOT NULL
 			}
 		}
 
-		if len(in.DeviceIds) != 0 && len(statements) == 0 && !removeCustomId && !removeEmail {
+		if len(newPassword) != 0 {
+			// Update the password on the user account only if they have an email associated.
+			res, err := tx.ExecContext(ctx, "UPDATE users SET password = $2, update_time = now() WHERE id = $1 AND email IS NOT NULL", userID, newPassword)
+			if err != nil {
+				s.logger.Error("Could not update password.", zap.Error(err), zap.Any("user_id", userID))
+				return err
+			}
+			if rowsAffected, _ := res.RowsAffected(); rowsAffected != 1 {
+				return StatusError(codes.InvalidArgument, "Cannot set a password on an account with no email address.", ErrRowsAffectedCount)
+			}
+		}
+
+		if len(in.DeviceIds) != 0 && len(statements) == 0 && !removeCustomID && !removeEmail && len(newPassword) == 0 {
 			// Ensure the user account update time is touched if the device IDs have changed but no other updates were applied to the core user record.
 			_, err := tx.ExecContext(ctx, "UPDATE users SET update_time = now() WHERE id = $1", userID)
 			if err != nil {

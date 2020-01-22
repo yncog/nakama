@@ -19,9 +19,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/gob"
+
 	"github.com/gofrs/uuid"
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/heroiclabs/nakama/api"
+	"github.com/heroiclabs/nakama-common/api"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -33,7 +34,7 @@ func (s *ApiServer) ListNotifications(ctx context.Context, in *api.ListNotificat
 	// Before hook.
 	if fn := s.runtime.BeforeListNotifications(); fn != nil {
 		beforeFn := func(clientIP, clientPort string) error {
-			result, err, code := fn(ctx, s.logger, userID.String(), ctx.Value(ctxUsernameKey{}).(string), ctx.Value(ctxExpiryKey{}).(int64), clientIP, clientPort, in)
+			result, err, code := fn(ctx, s.logger, userID.String(), ctx.Value(ctxUsernameKey{}).(string), ctx.Value(ctxVarsKey{}).(map[string]string), ctx.Value(ctxExpiryKey{}).(int64), clientIP, clientPort, in)
 			if err != nil {
 				return status.Error(code, err.Error())
 			}
@@ -62,17 +63,17 @@ func (s *ApiServer) ListNotifications(ctx context.Context, in *api.ListNotificat
 	}
 
 	cursor := in.GetCacheableCursor()
-	var nc *notificationCacheableCursor = nil
+	var nc *notificationCacheableCursor
 	if cursor != "" {
 		nc = &notificationCacheableCursor{}
-		if cb, err := base64.RawURLEncoding.DecodeString(cursor); err != nil {
+		cb, err := base64.RawURLEncoding.DecodeString(cursor)
+		if err != nil {
 			s.logger.Warn("Could not base64 decode notification cursor.", zap.String("cursor", cursor))
 			return nil, status.Error(codes.InvalidArgument, "Malformed cursor was used.")
-		} else {
-			if err := gob.NewDecoder(bytes.NewReader(cb)).Decode(nc); err != nil {
-				s.logger.Warn("Could not decode notification cursor.", zap.String("cursor", cursor))
-				return nil, status.Error(codes.InvalidArgument, "Malformed cursor was used.")
-			}
+		}
+		if err := gob.NewDecoder(bytes.NewReader(cb)).Decode(nc); err != nil {
+			s.logger.Warn("Could not decode notification cursor.", zap.String("cursor", cursor))
+			return nil, status.Error(codes.InvalidArgument, "Malformed cursor was used.")
 		}
 	}
 
@@ -84,7 +85,7 @@ func (s *ApiServer) ListNotifications(ctx context.Context, in *api.ListNotificat
 	// After hook.
 	if fn := s.runtime.AfterListNotifications(); fn != nil {
 		afterFn := func(clientIP, clientPort string) {
-			fn(ctx, s.logger, userID.String(), ctx.Value(ctxUsernameKey{}).(string), ctx.Value(ctxExpiryKey{}).(int64), clientIP, clientPort, notificationList, in)
+			fn(ctx, s.logger, userID.String(), ctx.Value(ctxUsernameKey{}).(string), ctx.Value(ctxVarsKey{}).(map[string]string), ctx.Value(ctxExpiryKey{}).(int64), clientIP, clientPort, notificationList, in)
 		}
 
 		// Execute the after function lambda wrapped in a trace for stats measurement.
@@ -100,7 +101,7 @@ func (s *ApiServer) DeleteNotifications(ctx context.Context, in *api.DeleteNotif
 	// Before hook.
 	if fn := s.runtime.BeforeDeleteNotification(); fn != nil {
 		beforeFn := func(clientIP, clientPort string) error {
-			result, err, code := fn(ctx, s.logger, ctx.Value(ctxUserIDKey{}).(uuid.UUID).String(), ctx.Value(ctxUsernameKey{}).(string), ctx.Value(ctxExpiryKey{}).(int64), clientIP, clientPort, in)
+			result, err, code := fn(ctx, s.logger, ctx.Value(ctxUserIDKey{}).(uuid.UUID).String(), ctx.Value(ctxUsernameKey{}).(string), ctx.Value(ctxVarsKey{}).(map[string]string), ctx.Value(ctxExpiryKey{}).(int64), clientIP, clientPort, in)
 			if err != nil {
 				return status.Error(code, err.Error())
 			}
@@ -131,7 +132,7 @@ func (s *ApiServer) DeleteNotifications(ctx context.Context, in *api.DeleteNotif
 	// After hook.
 	if fn := s.runtime.AfterDeleteNotification(); fn != nil {
 		afterFn := func(clientIP, clientPort string) {
-			fn(ctx, s.logger, ctx.Value(ctxUserIDKey{}).(uuid.UUID).String(), ctx.Value(ctxUsernameKey{}).(string), ctx.Value(ctxExpiryKey{}).(int64), clientIP, clientPort, in)
+			fn(ctx, s.logger, ctx.Value(ctxUserIDKey{}).(uuid.UUID).String(), ctx.Value(ctxUsernameKey{}).(string), ctx.Value(ctxVarsKey{}).(map[string]string), ctx.Value(ctxExpiryKey{}).(int64), clientIP, clientPort, in)
 		}
 
 		// Execute the after function lambda wrapped in a trace for stats measurement.

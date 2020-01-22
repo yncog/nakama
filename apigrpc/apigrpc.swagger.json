@@ -859,6 +859,33 @@
         ]
       }
     },
+    "/v2/event": {
+      "post": {
+        "summary": "Submit an event for processing in the server's registered runtime custom events handler.",
+        "operationId": "Event",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/apiEvent"
+            }
+          }
+        ],
+        "tags": [
+          "Nakama"
+        ]
+      }
+    },
     "/v2/friend": {
       "get": {
         "summary": "List all friends for the current user.",
@@ -1199,6 +1226,42 @@
           {
             "name": "user_ids",
             "description": "The users to add.",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+          ],
+        "tags": [
+          "Nakama"
+        ]
+      }
+    },
+    "/v2/group/{group_id}/ban": {
+      "post": {
+        "summary": "Ban a set of users from a group.",
+        "operationId": "BanGroupUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "properties": {}
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "group_id",
+            "description": "The group to ban users from.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "user_ids",
+            "description": "The users to ban.",
             "in": "query",
             "required": false,
             "type": "array",
@@ -1883,14 +1946,6 @@
             "in": "query",
             "required": false,
             "type": "string"
-          },
-          {
-            "name": "expiry",
-            "description": "Expiry in seconds (since epoch) to begin fetching records from.",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "format": "int64"
           }
         ],
         "tags": [
@@ -2393,6 +2448,13 @@
         "id": {
           "type": "string",
           "description": "A custom identifier."
+        },
+        "vars": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra information that will be bundled in the session token."
         }
       },
       "description": "Send a custom ID to the server. Used with authenticate/link/unlink."
@@ -2403,6 +2465,13 @@
         "id": {
           "type": "string",
           "description": "A device identifier. Should be obtained by a platform-specific device API."
+        },
+        "vars": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra information that will be bundled in the session token."
         }
       },
       "description": "Send a device to the server. Used with authenticate/link/unlink and user."
@@ -2417,6 +2486,13 @@
         "password": {
           "type": "string",
           "description": "A password for the user account."
+        },
+        "vars": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra information that will be bundled in the session token."
         }
       },
       "description": "Send an email with password to the server. Used with authenticate/link/unlink."
@@ -2427,6 +2503,13 @@
         "token": {
           "type": "string",
           "description": "The OAuth token received from Facebook to access their profile API."
+        },
+        "vars": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra information that will be bundled in the session token."
         }
       },
       "description": "Send a Facebook token to the server. Used with authenticate/link/unlink."
@@ -2458,6 +2541,13 @@
         "public_key_url": {
           "type": "string",
           "description": "The URL for the public encryption key."
+        },
+        "vars": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra information that will be bundled in the session token."
         }
       },
       "description": "Send Apple's Game Center account credentials to the server. Used with authenticate/link/unlink."
@@ -2468,6 +2558,13 @@
         "token": {
           "type": "string",
           "description": "The OAuth token received from Google to access their profile API."
+        },
+        "vars": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra information that will be bundled in the session token."
         }
       },
       "description": "Send a Google token to the server. Used with authenticate/link/unlink."
@@ -2478,6 +2575,13 @@
         "token": {
           "type": "string",
           "description": "The account token received from Steam to access their profile API."
+        },
+        "vars": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra information that will be bundled in the session token."
         }
       },
       "description": "Send a Steam token to the server. Used with authenticate/link/unlink."
@@ -2524,6 +2628,22 @@
           "type": "boolean",
           "format": "boolean",
           "description": "True if the message was persisted to the channel's history, false otherwise."
+        },
+        "room_name": {
+          "type": "string",
+          "description": "The name of the chat room, or an empty string if this message was not sent through a chat room."
+        },
+        "group_id": {
+          "type": "string",
+          "description": "The ID of the group, or an empty string if this message was not sent through a group channel."
+        },
+        "user_id_one": {
+          "type": "string",
+          "description": "The ID of the first DM user, or an empty string if this message was not sent through a DM chat."
+        },
+        "user_id_two": {
+          "type": "string",
+          "description": "The ID of the second DM user, or an empty string if this message was not sent through a DM chat."
         }
       },
       "description": "A message sent on a channel."
@@ -2611,6 +2731,33 @@
         }
       },
       "description": "Batch delete storage objects."
+    },
+    "apiEvent": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "An event name, type, category, or identifier."
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Arbitrary event property values."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The time when the event was triggered."
+        },
+        "external": {
+          "type": "boolean",
+          "format": "boolean",
+          "description": "True if the event came directly from a client call, false otherwise."
+        }
+      },
+      "description": "Represents an event to be passed through the server to registered event handlers."
     },
     "apiFriend": {
       "type": "object",

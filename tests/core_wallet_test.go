@@ -1,3 +1,17 @@
+// Copyright 2019 The Nakama Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package tests
 
 import (
@@ -6,8 +20,8 @@ import (
 	"testing"
 
 	"github.com/gofrs/uuid"
-	"github.com/heroiclabs/nakama/runtime"
-	"github.com/heroiclabs/nakama/server"
+	"github.com/heroiclabs/nakama-common/runtime"
+	"github.com/heroiclabs/nakama/v2/server"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -57,7 +71,7 @@ func TestUpdateWalletSingleUser(t *testing.T) {
 	}
 
 	db := NewDB(t)
-	nk := server.NewRuntimeGoNakamaModule(logger, db, config, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	nk := server.NewRuntimeGoNakamaModule(logger, db, nil, config, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	userID, _, _, err := server.AuthenticateCustom(context.Background(), logger, db, uuid.Must(uuid.NewV4()).String(), uuid.Must(uuid.NewV4()).String(), true)
 	if err != nil {
@@ -135,7 +149,7 @@ func TestUpdateWalletMultiUser(t *testing.T) {
 	}
 
 	db := NewDB(t)
-	nk := server.NewRuntimeGoNakamaModule(logger, db, config, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	nk := server.NewRuntimeGoNakamaModule(logger, db, nil, config, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	count := 5
 
 	userIDs := make([]string, 0, count)
@@ -222,7 +236,7 @@ func TestUpdateWalletsMultiUser(t *testing.T) {
 	}
 
 	db := NewDB(t)
-	nk := server.NewRuntimeGoNakamaModule(logger, db, config, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	nk := server.NewRuntimeGoNakamaModule(logger, db, nil, config, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	count := 5
 
 	userIDs := make([]string, 0, count)
@@ -314,7 +328,7 @@ func TestUpdateWalletsMultiUserSharedChangeset(t *testing.T) {
 	}
 
 	db := NewDB(t)
-	nk := server.NewRuntimeGoNakamaModule(logger, db, config, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	nk := server.NewRuntimeGoNakamaModule(logger, db, nil, config, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	count := 5
 
 	userIDs := make([]string, 0, count)
@@ -410,7 +424,7 @@ func TestUpdateWalletsMultiUserSharedChangesetDeductions(t *testing.T) {
 	}
 
 	db := NewDB(t)
-	nk := server.NewRuntimeGoNakamaModule(logger, db, config, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	nk := server.NewRuntimeGoNakamaModule(logger, db, nil, config, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	count := 5
 
 	userIDs := make([]string, 0, count)
@@ -465,7 +479,7 @@ func TestUpdateWalletsMultiUserSharedChangesetDeductions(t *testing.T) {
 
 func TestUpdateWalletsSingleUser(t *testing.T) {
 	db := NewDB(t)
-	nk := server.NewRuntimeGoNakamaModule(logger, db, config, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	nk := server.NewRuntimeGoNakamaModule(logger, db, nil, config, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	userID, _, _, err := server.AuthenticateCustom(context.Background(), logger, db, uuid.Must(uuid.NewV4()).String(), uuid.Must(uuid.NewV4()).String(), true)
 	if err != nil {
@@ -473,15 +487,15 @@ func TestUpdateWalletsSingleUser(t *testing.T) {
 	}
 
 	updates := []*runtime.WalletUpdate{
-		&runtime.WalletUpdate{
+		{
 			UserID:    userID,
 			Changeset: map[string]interface{}{"value": float64(1)},
 		},
-		&runtime.WalletUpdate{
+		{
 			UserID:    userID,
 			Changeset: map[string]interface{}{"value": float64(2)},
 		},
-		&runtime.WalletUpdate{
+		{
 			UserID:    userID,
 			Changeset: map[string]interface{}{"value": float64(3)},
 		},
@@ -512,7 +526,7 @@ func TestUpdateWalletsSingleUser(t *testing.T) {
 
 func TestUpdateWalletRepeatedSingleUser(t *testing.T) {
 	db := NewDB(t)
-	nk := server.NewRuntimeGoNakamaModule(logger, db, config, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	nk := server.NewRuntimeGoNakamaModule(logger, db, nil, config, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	userID, _, _, err := server.AuthenticateCustom(context.Background(), logger, db, uuid.Must(uuid.NewV4()).String(), uuid.Must(uuid.NewV4()).String(), true)
 	if err != nil {

@@ -160,7 +160,7 @@ dAUK75fDiSKxH3fzvc1D1PFMqT+1i4SvZPLQFCE=
 
 // GetFacebookProfile retrieves the user's Facebook Profile given the accessToken
 func (c *Client) GetFacebookProfile(ctx context.Context, accessToken string) (*FacebookProfile, error) {
-	path := "https://graph.facebook.com/v2.12/me?access_token=" + url.QueryEscape(accessToken) +
+	path := "https://graph.facebook.com/v5.0/me?access_token=" + url.QueryEscape(accessToken) +
 		"&fields=" + url.QueryEscape("name,email,gender,locale,timezone")
 	var profile FacebookProfile
 	err := c.request(ctx, "facebook profile", path, nil, &profile)
@@ -177,7 +177,7 @@ func (c *Client) GetFacebookFriends(ctx context.Context, accessToken string) ([]
 	after := ""
 	for {
 		// In FB Graph API 2.0+ this only returns friends that also use the same app.
-		path := "https://graph.facebook.com/v2.12/me/friends?access_token=" + url.QueryEscape(accessToken)
+		path := "https://graph.facebook.com/v5.0/me/friends?access_token=" + url.QueryEscape(accessToken)
 		if after != "" {
 			path += "&after=" + after
 		}
@@ -308,11 +308,11 @@ func (c *Client) CheckGoogleToken(ctx context.Context, idToken string) (*GoogleP
 	if v, ok := claims["iat"]; ok {
 		switch v.(type) {
 		case string:
-			if vi, err := strconv.Atoi(v.(string)); err != nil {
+			vi, err := strconv.Atoi(v.(string))
+			if err != nil {
 				return nil, errors.New("google id token iat field invalid")
-			} else {
-				profile.Iat = int64(vi)
 			}
+			profile.Iat = int64(vi)
 		case float64:
 			profile.Iat = int64(v.(float64))
 		case int64:
@@ -324,11 +324,11 @@ func (c *Client) CheckGoogleToken(ctx context.Context, idToken string) (*GoogleP
 	if v, ok := claims["exp"]; ok {
 		switch v.(type) {
 		case string:
-			if vi, err := strconv.Atoi(v.(string)); err != nil {
+			vi, err := strconv.Atoi(v.(string))
+			if err != nil {
 				return nil, errors.New("google id token exp field invalid")
-			} else {
-				profile.Exp = int64(vi)
 			}
+			profile.Exp = int64(vi)
 		case float64:
 			profile.Exp = int64(v.(float64))
 		case int64:
@@ -347,11 +347,11 @@ func (c *Client) CheckGoogleToken(ctx context.Context, idToken string) (*GoogleP
 		case bool:
 			profile.EmailVerified = v.(bool)
 		case string:
-			if vb, err := strconv.ParseBool(v.(string)); err != nil {
+			vb, err := strconv.ParseBool(v.(string))
+			if err != nil {
 				return nil, errors.New("google id token email_verified field invalid")
-			} else {
-				profile.EmailVerified = vb
 			}
+			profile.EmailVerified = vb
 		default:
 			return nil, errors.New("google id token email_verified field unknown")
 		}

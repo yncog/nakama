@@ -19,7 +19,7 @@
 * **Runtime code** - Extend the server with custom logic written in Lua or native Go code.
 * **Matchmaker**, **dashboard**, **metrics**, and [more](https://heroiclabs.com/docs).
 
-Build scalable games and apps with a production ready server used by ambitious game studios and app developers [all around the world](https://heroiclabs.com). Have a look at the [documentation](https://heroiclabs.com/docs) and join the [developer community](https://gitter.im/heroiclabs/nakama) for more info.
+Build scalable games and apps with a production ready server used by ambitious game studios and app developers [all around the world](https://heroiclabs.com). Have a look at the [documentation](https://heroiclabs.com/docs) and join the [developer community](https://forum.heroiclabs.com) for more info.
 
 ## Getting Started
 
@@ -116,7 +116,7 @@ All dependencies required for a build are vendored as part of the Go project. Yo
 ```shell
 git clone https://github.com/heroiclabs/nakama.git $GOPATH/src/github.com/heroiclabs/nakama
 cd $GOPATH/src/github.com/heroiclabs/nakama
-go build -i
+go build -trimpath
 ```
 
 ### Full Source Builds
@@ -148,7 +148,7 @@ To build the codebase and generate all sources use these steps.
     protoc -I/usr/local/include -I. -I$GOPATH/src -I$GOPATH/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis -I$GOPATH/src/github.com/grpc-ecosystem/grpc-gateway --go_out=plugins=grpc:. ./api/api.proto
     protoc -I/usr/local/include -I. -I$GOPATH/src -I$GOPATH/src/github.com/grpc-ecosystem/grpc-gateway/third_party/googleapis -I$GOPATH/src/github.com/grpc-ecosystem/grpc-gateway --grpc-gateway_out=logtostderr=true:. ./api/api.proto
     packr -z
-    go build -i
+    go build --trimpath
     ```
 
 ### License

@@ -19,16 +19,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/golang/protobuf/proto"
 	"sync"
 	"time"
+
+	"github.com/golang/protobuf/proto"
 
 	"net"
 
 	"github.com/gofrs/uuid"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/gorilla/websocket"
-	"github.com/heroiclabs/nakama/rtapi"
+	"github.com/heroiclabs/nakama-common/rtapi"
 	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
@@ -43,6 +44,7 @@ type sessionWS struct {
 	format     SessionFormat
 	userID     uuid.UUID
 	username   *atomic.String
+	vars       map[string]string
 	expiry     int64
 	clientIP   string
 	clientPort string
@@ -71,7 +73,7 @@ type sessionWS struct {
 	outgoingCh             chan []byte
 }
 
-func NewSessionWS(logger *zap.Logger, config Config, format SessionFormat, userID uuid.UUID, username string, expiry int64, clientIP string, clientPort string, jsonpbMarshaler *jsonpb.Marshaler, jsonpbUnmarshaler *jsonpb.Unmarshaler, conn *websocket.Conn, sessionRegistry SessionRegistry, matchmaker Matchmaker, tracker Tracker, pipeline *Pipeline, runtime *Runtime) Session {
+func NewSessionWS(logger *zap.Logger, config Config, format SessionFormat, userID uuid.UUID, username string, vars map[string]string, expiry int64, clientIP string, clientPort string, jsonpbMarshaler *jsonpb.Marshaler, jsonpbUnmarshaler *jsonpb.Unmarshaler, conn *websocket.Conn, sessionRegistry SessionRegistry, matchmaker Matchmaker, tracker Tracker, pipeline *Pipeline, runtime *Runtime) Session {
 	sessionID := uuid.Must(uuid.NewV4())
 	sessionLogger := logger.With(zap.String("uid", userID.String()), zap.String("sid", sessionID.String()))
 
@@ -91,6 +93,7 @@ func NewSessionWS(logger *zap.Logger, config Config, format SessionFormat, userI
 		format:     format,
 		userID:     userID,
 		username:   atomic.NewString(username),
+		vars:       vars,
 		expiry:     expiry,
 		clientIP:   clientIP,
 		clientPort: clientPort,
@@ -152,6 +155,10 @@ func (s *sessionWS) SetUsername(username string) {
 	s.username.Store(username)
 }
 
+func (s *sessionWS) Vars() map[string]string {
+	return s.vars
+}
+
 func (s *sessionWS) Expiry() int64 {
 	return s.expiry
 }
@@ -159,7 +166,7 @@ func (s *sessionWS) Expiry() int64 {
 func (s *sessionWS) Consume() {
 	// Fire an event for session start.
 	if fn := s.runtime.EventSessionStart(); fn != nil {
-		fn(s.userID.String(), s.username.Load(), s.expiry, s.id.String(), s.clientIP, s.clientPort, time.Now().UTC().Unix())
+		fn(s.userID.String(), s.username.Load(), s.vars, s.expiry, s.id.String(), s.clientIP, s.clientPort, time.Now().UTC().Unix())
 	}
 
 	s.conn.SetReadLimit(s.config.GetSocket().MaxMessageSizeBytes)
@@ -370,7 +377,7 @@ func (s *sessionWS) Send(envelope *rtapi.Envelope, reliable bool) error {
 		}
 	}
 
-	return s.SendBytes([]byte(payload), reliable)
+	return s.SendBytes(payload, reliable)
 }
 
 func (s *sessionWS) SendBytes(payload []byte, reliable bool) error {
@@ -446,6 +453,6 @@ func (s *sessionWS) Close(reason string) {
 
 	// Fire an event for session end.
 	if fn := s.runtime.EventSessionEnd(); fn != nil {
-		fn(s.userID.String(), s.username.Load(), s.expiry, s.id.String(), s.clientIP, s.clientPort, time.Now().UTC().Unix(), reason)
+		fn(s.userID.String(), s.username.Load(), s.vars, s.expiry, s.id.String(), s.clientIP, s.clientPort, time.Now().UTC().Unix(), reason)
 	}
 }

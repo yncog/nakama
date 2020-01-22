@@ -26,13 +26,14 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid"
+	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/golang/protobuf/ptypes/wrappers"
-	"github.com/heroiclabs/nakama/api"
-	"github.com/heroiclabs/nakama/cronexpr"
-	"github.com/heroiclabs/nakama/rtapi"
-	"github.com/heroiclabs/nakama/runtime"
-	"github.com/heroiclabs/nakama/social"
+	"github.com/heroiclabs/nakama-common/api"
+	"github.com/heroiclabs/nakama-common/rtapi"
+	"github.com/heroiclabs/nakama-common/runtime"
+	"github.com/heroiclabs/nakama/v2/cronexpr"
+	"github.com/heroiclabs/nakama/v2/social"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
@@ -41,6 +42,7 @@ type RuntimeGoNakamaModule struct {
 	sync.RWMutex
 	logger               *zap.Logger
 	db                   *sql.DB
+	jsonpbMarshaler      *jsonpb.Marshaler
 	config               Config
 	socialClient         *social.Client
 	leaderboardCache     LeaderboardCache
@@ -52,15 +54,18 @@ type RuntimeGoNakamaModule struct {
 	streamManager        StreamManager
 	router               MessageRouter
 
+	eventFn RuntimeEventCustomFunction
+
 	node string
 
 	matchCreateFn RuntimeMatchCreateFunction
 }
 
-func NewRuntimeGoNakamaModule(logger *zap.Logger, db *sql.DB, config Config, socialClient *social.Client, leaderboardCache LeaderboardCache, leaderboardRankCache LeaderboardRankCache, leaderboardScheduler LeaderboardScheduler, sessionRegistry SessionRegistry, matchRegistry MatchRegistry, tracker Tracker, streamManager StreamManager, router MessageRouter) *RuntimeGoNakamaModule {
+func NewRuntimeGoNakamaModule(logger *zap.Logger, db *sql.DB, jsonpbMarshaler *jsonpb.Marshaler, config Config, socialClient *social.Client, leaderboardCache LeaderboardCache, leaderboardRankCache LeaderboardRankCache, leaderboardScheduler LeaderboardScheduler, sessionRegistry SessionRegistry, matchRegistry MatchRegistry, tracker Tracker, streamManager StreamManager, router MessageRouter) *RuntimeGoNakamaModule {
 	return &RuntimeGoNakamaModule{
 		logger:               logger,
 		db:                   db,
+		jsonpbMarshaler:      jsonpbMarshaler,
 		config:               config,
 		socialClient:         socialClient,
 		leaderboardCache:     leaderboardCache,
@@ -245,7 +250,7 @@ func (n *RuntimeGoNakamaModule) AuthenticateSteam(ctx context.Context, token, us
 	return AuthenticateSteam(ctx, n.logger, n.db, n.socialClient, n.config.GetSocial().Steam.AppID, n.config.GetSocial().Steam.PublisherKey, token, username, create)
 }
 
-func (n *RuntimeGoNakamaModule) AuthenticateTokenGenerate(userID, username string, exp int64) (string, int64, error) {
+func (n *RuntimeGoNakamaModule) AuthenticateTokenGenerate(userID, username string, vars map[string]string, exp int64) (string, int64, error) {
 	if userID == "" {
 		return "", 0, errors.New("expects user id")
 	}
@@ -263,7 +268,7 @@ func (n *RuntimeGoNakamaModule) AuthenticateTokenGenerate(userID, username strin
 		exp = time.Now().UTC().Add(time.Duration(n.config.GetSession().TokenExpirySec) * time.Second).Unix()
 	}
 
-	token, exp := generateTokenWithExpiry(n.config, userID, username, exp)
+	token, exp := generateTokenWithExpiry(n.config, userID, username, vars, exp)
 	return token, exp, nil
 }
 
@@ -337,6 +342,25 @@ func (n *RuntimeGoNakamaModule) AccountDeleteId(ctx context.Context, userID stri
 	}
 
 	return DeleteAccount(ctx, n.logger, n.db, u, recorded)
+}
+
+func (n *RuntimeGoNakamaModule) AccountExportId(ctx context.Context, userID string) (string, error) {
+	u, err := uuid.FromString(userID)
+	if err != nil {
+		return "", errors.New("expects user ID to be a valid identifier")
+	}
+
+	export, err := ExportAccount(ctx, n.logger, n.db, u)
+	if err != nil {
+		return "", errors.Errorf("error exporting account: %v", err.Error())
+	}
+
+	exportString, err := n.jsonpbMarshaler.MarshalToString(export)
+	if err != nil {
+		return "", errors.Errorf("error encoding account export: %v", err.Error())
+	}
+
+	return exportString, nil
 }
 
 func (n *RuntimeGoNakamaModule) UsersGetId(ctx context.Context, userIDs []string) ([]*api.User, error) {
@@ -821,7 +845,7 @@ func (n *RuntimeGoNakamaModule) MatchCreate(ctx context.Context, module string, 
 	return n.matchRegistry.CreateMatch(ctx, n.logger, fn, module, params)
 }
 
-func (n *RuntimeGoNakamaModule) MatchList(ctx context.Context, limit int, authoritative bool, label string, minSize, maxSize int, query string) ([]*api.Match, error) {
+func (n *RuntimeGoNakamaModule) MatchList(ctx context.Context, limit int, authoritative bool, label string, minSize, maxSize *int, query string) ([]*api.Match, error) {
 	authoritativeWrapper := &wrappers.BoolValue{Value: authoritative}
 	var labelWrapper *wrappers.StringValue
 	if label != "" {
@@ -831,8 +855,14 @@ func (n *RuntimeGoNakamaModule) MatchList(ctx context.Context, limit int, author
 	if query != "" {
 		queryWrapper = &wrappers.StringValue{Value: query}
 	}
-	minSizeWrapper := &wrappers.Int32Value{Value: int32(minSize)}
-	maxSizeWrapper := &wrappers.Int32Value{Value: int32(maxSize)}
+	var minSizeWrapper *wrappers.Int32Value
+	if minSize != nil {
+		minSizeWrapper = &wrappers.Int32Value{Value: int32(*minSize)}
+	}
+	var maxSizeWrapper *wrappers.Int32Value
+	if maxSize != nil {
+		maxSizeWrapper = &wrappers.Int32Value{Value: int32(*maxSize)}
+	}
 
 	return n.matchRegistry.ListMatches(ctx, limit, authoritativeWrapper, labelWrapper, minSizeWrapper, maxSizeWrapper, queryWrapper)
 }
@@ -947,7 +977,7 @@ func (n *RuntimeGoNakamaModule) WalletUpdate(ctx context.Context, userID string,
 		}
 	}
 
-	return UpdateWallets(ctx, n.logger, n.db, []*walletUpdate{&walletUpdate{
+	return UpdateWallets(ctx, n.logger, n.db, []*walletUpdate{{
 		UserID:    uid,
 		Changeset: changeset,
 		Metadata:  string(metadataBytes),
@@ -1000,22 +1030,26 @@ func (n *RuntimeGoNakamaModule) WalletLedgerUpdate(ctx context.Context, itemID s
 	return UpdateWalletLedger(ctx, n.logger, n.db, id, string(metadataBytes))
 }
 
-func (n *RuntimeGoNakamaModule) WalletLedgerList(ctx context.Context, userID string) ([]runtime.WalletLedgerItem, error) {
+func (n *RuntimeGoNakamaModule) WalletLedgerList(ctx context.Context, userID string, limit int, cursor string) ([]runtime.WalletLedgerItem, string, error) {
 	uid, err := uuid.FromString(userID)
 	if err != nil {
-		return nil, errors.New("expects a valid user id")
+		return nil, "", errors.New("expects a valid user id")
 	}
 
-	items, err := ListWalletLedger(ctx, n.logger, n.db, uid)
+	if limit < 0 || limit > 100 {
+		return nil, "", errors.New("expects limit to be 0-100")
+	}
+
+	items, newCursor, err := ListWalletLedger(ctx, n.logger, n.db, uid, &limit, cursor)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	runtimeItems := make([]runtime.WalletLedgerItem, len(items))
 	for i, item := range items {
 		runtimeItems[i] = runtime.WalletLedgerItem(item)
 	}
-	return runtimeItems, nil
+	return runtimeItems, newCursor, nil
 }
 
 func (n *RuntimeGoNakamaModule) StorageList(ctx context.Context, userID, collection string, limit int, cursor string) ([]*api.StorageObject, string, error) {
@@ -1094,8 +1128,7 @@ func (n *RuntimeGoNakamaModule) StorageWrite(ctx context.Context, writes []*runt
 				return nil, errors.New("expects an empty or valid user id")
 			}
 		}
-		var valueMap map[string]interface{}
-		if err := json.Unmarshal([]byte(write.Value), &valueMap); err != nil {
+		if maybeJSON := []byte(write.Value); !json.Valid(maybeJSON) || bytes.TrimSpace(maybeJSON)[0] != byteBracket {
 			return nil, errors.New("value must be a JSON-encoded object")
 		}
 
@@ -1242,9 +1275,8 @@ func (n *RuntimeGoNakamaModule) LeaderboardRecordsList(ctx context.Context, id s
 	var limitWrapper *wrappers.Int32Value
 	if limit < 0 || limit > 10000 {
 		return nil, nil, "", "", errors.New("expects limit to be 0-10000")
-	} else {
-		limitWrapper = &wrappers.Int32Value{Value: int32(limit)}
 	}
+	limitWrapper = &wrappers.Int32Value{Value: int32(limit)}
 
 	if expiry < 0 {
 		return nil, nil, "", "", errors.New("expects expiry to equal or greater than 0")
@@ -1411,6 +1443,14 @@ func (n *RuntimeGoNakamaModule) TournamentJoin(ctx context.Context, id, ownerID,
 	return TournamentJoin(ctx, n.logger, n.db, n.leaderboardCache, ownerID, username, id)
 }
 
+func (n *RuntimeGoNakamaModule) TournamentsGetId(ctx context.Context, tournamentIDs []string) ([]*api.Tournament, error) {
+	if len(tournamentIDs) == 0 {
+		return []*api.Tournament{}, nil
+	}
+
+	return TournamentsGet(ctx, n.logger, n.db, tournamentIDs)
+}
+
 func (n *RuntimeGoNakamaModule) TournamentList(ctx context.Context, categoryStart, categoryEnd, startTime, endTime, limit int, cursor string) (*api.TournamentList, error) {
 
 	if categoryStart < 0 || categoryStart >= 128 {
@@ -1433,19 +1473,19 @@ func (n *RuntimeGoNakamaModule) TournamentList(ctx context.Context, categoryStar
 		return nil, errors.New("limit must be 1-100")
 	}
 
-	var cursorPtr *tournamentListCursor
+	var cursorPtr *TournamentListCursor
 	if cursor != "" {
-		if cb, err := base64.StdEncoding.DecodeString(cursor); err != nil {
+		cb, err := base64.StdEncoding.DecodeString(cursor)
+		if err != nil {
 			return nil, errors.New("expects cursor to be valid when provided")
-		} else {
-			cursorPtr = &tournamentListCursor{}
-			if err := gob.NewDecoder(bytes.NewReader(cb)).Decode(cursorPtr); err != nil {
-				return nil, errors.New("expects cursor to be valid when provided")
-			}
+		}
+		cursorPtr = &TournamentListCursor{}
+		if err := gob.NewDecoder(bytes.NewReader(cb)).Decode(cursorPtr); err != nil {
+			return nil, errors.New("expects cursor to be valid when provided")
 		}
 	}
 
-	return TournamentList(ctx, n.logger, n.db, categoryStart, categoryEnd, startTime, endTime, limit, cursorPtr)
+	return TournamentList(ctx, n.logger, n.db, n.leaderboardCache, categoryStart, categoryEnd, startTime, endTime, limit, cursorPtr)
 }
 
 func (n *RuntimeGoNakamaModule) TournamentRecordWrite(ctx context.Context, id, ownerID, username string, score, subscore int64, metadata map[string]interface{}) (*api.LeaderboardRecord, error) {
@@ -1576,9 +1616,9 @@ func (n *RuntimeGoNakamaModule) GroupUpdate(ctx context.Context, id, name, creat
 		descriptionWrapper = &wrappers.StringValue{Value: description}
 	}
 
-	var avatarUrlWrapper *wrappers.StringValue
+	var avatarURLWrapper *wrappers.StringValue
 	if avatarUrl != "" {
-		avatarUrlWrapper = &wrappers.StringValue{Value: avatarUrl}
+		avatarURLWrapper = &wrappers.StringValue{Value: avatarUrl}
 	}
 
 	openWrapper := &wrappers.BoolValue{Value: open}
@@ -1597,7 +1637,7 @@ func (n *RuntimeGoNakamaModule) GroupUpdate(ctx context.Context, id, name, creat
 		maxCountValue = maxCount
 	}
 
-	return UpdateGroup(ctx, n.logger, n.db, groupID, uuid.Nil, creator, nameWrapper, langTagWrapper, descriptionWrapper, avatarUrlWrapper, metadataWrapper, openWrapper, maxCountValue)
+	return UpdateGroup(ctx, n.logger, n.db, groupID, uuid.Nil, creator, nameWrapper, langTagWrapper, descriptionWrapper, avatarURLWrapper, metadataWrapper, openWrapper, maxCountValue)
 }
 
 func (n *RuntimeGoNakamaModule) GroupDelete(ctx context.Context, id string) error {
@@ -1631,7 +1671,7 @@ func (n *RuntimeGoNakamaModule) GroupUsersKick(ctx context.Context, groupID stri
 		users = append(users, uid)
 	}
 
-	return KickGroupUsers(ctx, n.logger, n.db, uuid.Nil, group, users)
+	return KickGroupUsers(ctx, n.logger, n.db, n.router, uuid.Nil, group, users)
 }
 
 func (n *RuntimeGoNakamaModule) GroupUsersList(ctx context.Context, id string, limit int, state *int, cursor string) ([]*api.GroupUserList_GroupUser, error) {
@@ -1647,8 +1687,8 @@ func (n *RuntimeGoNakamaModule) GroupUsersList(ctx context.Context, id string, l
 	var stateWrapper *wrappers.Int32Value
 	if state != nil {
 		stateValue := *state
-		if stateValue < 0 || stateValue > 3 {
-			return nil, errors.New("expects state to be 0-3")
+		if stateValue < 0 || stateValue > 4 {
+			return nil, errors.New("expects state to be 0-4")
 		}
 		stateWrapper = &wrappers.Int32Value{Value: int32(stateValue)}
 	}
@@ -1674,8 +1714,8 @@ func (n *RuntimeGoNakamaModule) UserGroupsList(ctx context.Context, userID strin
 	var stateWrapper *wrappers.Int32Value
 	if state != nil {
 		stateValue := *state
-		if stateValue < 0 || stateValue > 3 {
-			return nil, errors.New("expects state to be 0-3")
+		if stateValue < 0 || stateValue > 4 {
+			return nil, errors.New("expects state to be 0-4")
 		}
 		stateWrapper = &wrappers.Int32Value{Value: int32(stateValue)}
 	}
@@ -1686,6 +1726,30 @@ func (n *RuntimeGoNakamaModule) UserGroupsList(ctx context.Context, userID strin
 	}
 
 	return groups.UserGroups, nil
+}
+
+func (n *RuntimeGoNakamaModule) Event(ctx context.Context, evt *api.Event) error {
+	if ctx == nil {
+		return errors.New("expects a non-nil context")
+	}
+	if evt == nil {
+		return errors.New("expects a non-nil event")
+	}
+
+	n.RLock()
+	fn := n.eventFn
+	n.RUnlock()
+	if fn != nil {
+		fn(ctx, evt)
+	}
+
+	return nil
+}
+
+func (n *RuntimeGoNakamaModule) SetEventFn(fn RuntimeEventCustomFunction) {
+	n.Lock()
+	n.eventFn = fn
+	n.Unlock()
 }
 
 func (n *RuntimeGoNakamaModule) SetMatchCreateFn(fn RuntimeMatchCreateFunction) {

@@ -24,12 +24,12 @@ import (
 	"flag"
 	"io/ioutil"
 
-	"github.com/heroiclabs/nakama/flags"
+	"github.com/heroiclabs/nakama/v2/flags"
 
 	"crypto/tls"
 
-	"github.com/go-yaml/yaml"
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v2"
 )
 
 // Config interface is the Nakama core configuration.
@@ -85,6 +85,7 @@ func ParseArgs(logger *zap.Logger, args []string) Config {
 		// Convert and preserve the runtime environment key-value pairs.
 		runtimeEnvironment = convertRuntimeEnv(logger, runtimeEnvironment, mainConfig.GetRuntime().Env)
 		runtimeEnvironmentList = append(runtimeEnvironmentList, mainConfig.GetRuntime().Env...)
+		logger.Info("Successfully loaded config file", zap.String("path", cfg))
 	}
 	// Preserve the config file path arguments.
 	mainConfig.Config = configFilePath.Config
@@ -168,8 +169,8 @@ func CheckConfig(logger *zap.Logger, config Config) map[string]string {
 		logger.Fatal("At least one database address must be specified", zap.Strings("database.address", config.GetDatabase().Addresses))
 	}
 	for _, address := range config.GetDatabase().Addresses {
-		rawUrl := fmt.Sprintf("postgresql://%s", address)
-		if _, err := url.Parse(rawUrl); err != nil {
+		rawURL := fmt.Sprintf("postgresql://%s", address)
+		if _, err := url.Parse(rawURL); err != nil {
 			logger.Fatal("Bad database connection URL", zap.String("database.address", address), zap.Error(err))
 		}
 	}
@@ -212,6 +213,12 @@ func CheckConfig(logger *zap.Logger, config Config) map[string]string {
 	if config.GetTracker().EventQueueSize < 1 {
 		logger.Fatal("Tracker presence event queue size must be >= 1", zap.Int("tracker.event_queue_size", config.GetTracker().EventQueueSize))
 	}
+	if config.GetLeaderboard().CallbackQueueSize < 1 {
+		logger.Fatal("Leaderboard callback queue stack size must be >= 1", zap.Int("leaderboard.callback_queue_size", config.GetLeaderboard().CallbackQueueSize))
+	}
+	if config.GetLeaderboard().CallbackQueueWorkers < 1 {
+		logger.Fatal("Leaderboard callback queue workers must be >= 1", zap.Int("leaderboard.callback_queue_workers", config.GetLeaderboard().CallbackQueueWorkers))
+	}
 
 	// If the runtime path is not overridden, set it to `datadir/modules`.
 	if config.GetRuntime().Path == "" {
@@ -241,7 +248,7 @@ func CheckConfig(logger *zap.Logger, config Config) map[string]string {
 		logger.Warn("WARNING: insecure default parameter value, change this for production!", zap.String("param", "session.encryption_key"))
 		configWarnings["session.encryption_key"] = "Insecure default parameter value, change this for production!"
 	}
-	if config.GetRuntime().HTTPKey == "defaultkey" {
+	if config.GetRuntime().HTTPKey == "defaulthttpkey" {
 		logger.Warn("WARNING: insecure default parameter value, change this for production!", zap.String("param", "runtime.http_key"))
 		configWarnings["runtime.http_key"] = "Insecure default parameter value, change this for production!"
 	}
@@ -273,6 +280,11 @@ func CheckConfig(logger *zap.Logger, config Config) map[string]string {
 		config.GetSocket().CertPEMBlock = certPEMBlock
 		config.GetSocket().KeyPEMBlock = keyPEMBlock
 		config.GetSocket().TLSCert = []tls.Certificate{cert}
+	}
+
+	// Set backwards-compatible defaults if overrides are not used.
+	if config.GetSocket().MaxRequestSizeBytes <= 0 {
+		config.GetSocket().MaxRequestSizeBytes = config.GetSocket().MaxMessageSizeBytes
 	}
 
 	return configWarnings
@@ -374,11 +386,11 @@ func (c *config) Clone() (Config, error) {
 	nc.Socket.KeyPEMBlock = make([]byte, len(c.Socket.KeyPEMBlock))
 	copy(nc.Socket.KeyPEMBlock, c.Socket.KeyPEMBlock)
 	if len(c.Socket.TLSCert) != 0 {
-		if cert, err := tls.X509KeyPair(nc.Socket.CertPEMBlock, nc.Socket.KeyPEMBlock); err != nil {
+		cert, err := tls.X509KeyPair(nc.Socket.CertPEMBlock, nc.Socket.KeyPEMBlock)
+		if err != nil {
 			return nil, err
-		} else {
-			nc.Socket.TLSCert = []tls.Certificate{cert}
 		}
+		nc.Socket.TLSCert = []tls.Certificate{cert}
 	}
 	nc.Database.Addresses = make([]string, len(c.Database.Addresses))
 	copy(nc.Database.Addresses, c.Database.Addresses)
@@ -519,7 +531,8 @@ type SocketConfig struct {
 	Port                 int               `yaml:"port" json:"port" usage:"The port for accepting connections from the client for the given interface(s), address(es), and protocol(s). Default 7350."`
 	Address              string            `yaml:"address" json:"address" usage:"The IP address of the interface to listen for client traffic on. Default listen on all available addresses/interfaces."`
 	Protocol             string            `yaml:"protocol" json:"protocol" usage:"The network protocol to listen for traffic on. Possible values are 'tcp' for both IPv4 and IPv6, 'tcp4' for IPv4 only, or 'tcp6' for IPv6 only. Default 'tcp'."`
-	MaxMessageSizeBytes  int64             `yaml:"max_message_size_bytes" json:"max_message_size_bytes" usage:"Maximum amount of data in bytes allowed to be read from the client socket per message. Used for real-time, gRPC and HTTP connections."`
+	MaxMessageSizeBytes  int64             `yaml:"max_message_size_bytes" json:"max_message_size_bytes" usage:"Maximum amount of data in bytes allowed to be read from the client socket per message. Used for real-time connections."`
+	MaxRequestSizeBytes  int64             `yaml:"max_request_size_bytes" json:"max_request_size_bytes" usage:"Maximum amount of data in bytes allowed to be read from clients per request. Used for gRPC and HTTP connections."`
 	ReadTimeoutMs        int               `yaml:"read_timeout_ms" json:"read_timeout_ms" usage:"Maximum duration in milliseconds for reading the entire request. Used for HTTP connections."`
 	WriteTimeoutMs       int               `yaml:"write_timeout_ms" json:"write_timeout_ms" usage:"Maximum duration in milliseconds before timing out writes of the response. Used for HTTP connections."`
 	IdleTimeoutMs        int               `yaml:"idle_timeout_ms" json:"idle_timeout_ms" usage:"Maximum amount of time in milliseconds to wait for the next request when keep-alives are enabled. Used for HTTP connections."`
@@ -543,6 +556,7 @@ func NewSocketConfig() *SocketConfig {
 		Address:              "",
 		Protocol:             "tcp",
 		MaxMessageSizeBytes:  4096,
+		MaxRequestSizeBytes:  0,
 		ReadTimeoutMs:        10 * 1000,
 		WriteTimeoutMs:       10 * 1000,
 		IdleTimeoutMs:        60 * 1000,
@@ -558,7 +572,7 @@ func NewSocketConfig() *SocketConfig {
 
 // DatabaseConfig is configuration relevant to the Database storage.
 type DatabaseConfig struct {
-	Addresses         []string `yaml:"address" json:"address" usage:"List of database servers (username:password@address:port/dbname). Default 'root@127.0.0.1:26257'."`
+	Addresses         []string `yaml:"address" json:"address" usage:"List of database servers (username:password@address:port/dbname). Default 'root@localhost:26257'."`
 	ConnMaxLifetimeMs int      `yaml:"conn_max_lifetime_ms" json:"conn_max_lifetime_ms" usage:"Time in milliseconds to reuse a database connection before the connection is killed and a new one is created. Default 3600000 (1 hour)."`
 	MaxOpenConns      int      `yaml:"max_open_conns" json:"max_open_conns" usage:"Maximum number of allowed open connections to the database. Default 100."`
 	MaxIdleConns      int      `yaml:"max_idle_conns" json:"max_idle_conns" usage:"Maximum number of allowed open but unused connections to the database. Default 100."`
@@ -567,7 +581,7 @@ type DatabaseConfig struct {
 // NewDatabaseConfig creates a new DatabaseConfig struct.
 func NewDatabaseConfig() *DatabaseConfig {
 	return &DatabaseConfig{
-		Addresses:         []string{"root@127.0.0.1:26257"},
+		Addresses:         []string{"root@localhost:26257"},
 		ConnMaxLifetimeMs: 3600000,
 		MaxOpenConns:      100,
 		MaxIdleConns:      100,
@@ -605,7 +619,7 @@ type RuntimeConfig struct {
 	MaxCount          int               `yaml:"max_count" json:"max_count" usage:"Maximum number of runtime instances to allocate. Default 256."`
 	CallStackSize     int               `yaml:"call_stack_size" json:"call_stack_size" usage:"Size of each runtime instance's call stack. Default 128."`
 	RegistrySize      int               `yaml:"registry_size" json:"registry_size" usage:"Size of each runtime instance's registry. Default 512."`
-	EventQueueSize    int               `yaml:"event_queue_size" json:"event_queue_size" usage:"Size of the event queue buffer. Default 8192."`
+	EventQueueSize    int               `yaml:"event_queue_size" json:"event_queue_size" usage:"Size of the event queue buffer. Default 65536."`
 	EventQueueWorkers int               `yaml:"event_queue_workers" json:"event_queue_workers" usage:"Number of workers to use for concurrent processing of events. Default 8."`
 }
 
@@ -615,12 +629,12 @@ func NewRuntimeConfig() *RuntimeConfig {
 		Environment:       make(map[string]string, 0),
 		Env:               make([]string, 0),
 		Path:              "",
-		HTTPKey:           "defaultkey",
+		HTTPKey:           "defaulthttpkey",
 		MinCount:          16,
 		MaxCount:          256,
 		CallStackSize:     128,
 		RegistrySize:      512,
-		EventQueueSize:    8192,
+		EventQueueSize:    65536,
 		EventQueueWorkers: 8,
 	}
 }
@@ -631,7 +645,7 @@ type MatchConfig struct {
 	CallQueueSize        int `yaml:"call_queue_size" json:"call_queue_size" usage:"Size of the authoritative match buffer that sequences calls to match handler callbacks to ensure no overlaps. Default 128."`
 	JoinAttemptQueueSize int `yaml:"join_attempt_queue_size" json:"join_attempt_queue_size" usage:"Size of the authoritative match buffer that limits the number of in-progress join attempts. Default 128."`
 	DeferredQueueSize    int `yaml:"deferred_queue_size" json:"deferred_queue_size" usage:"Size of the authoritative match buffer that holds deferred message broadcasts until the end of each loop execution. Default 128."`
-	JoinMarkerDeadlineMs int `yaml:"join_marker_deadline_ms" json:"join_marker_deadline_ms" usage:"Deadline in milliseconds that client authoritative match joins will wait for match handlers to acknowledge joins. Default 5000."`
+	JoinMarkerDeadlineMs int `yaml:"join_marker_deadline_ms" json:"join_marker_deadline_ms" usage:"Deadline in milliseconds that client authoritative match joins will wait for match handlers to acknowledge joins. Default 15000."`
 }
 
 // NewMatchConfig creates a new MatchConfig struct.
@@ -641,7 +655,7 @@ func NewMatchConfig() *MatchConfig {
 		CallQueueSize:        128,
 		JoinAttemptQueueSize: 128,
 		DeferredQueueSize:    128,
-		JoinMarkerDeadlineMs: 5000,
+		JoinMarkerDeadlineMs: 15000,
 	}
 }
 
@@ -688,12 +702,16 @@ func NewConsoleConfig() *ConsoleConfig {
 
 // LeaderboardConfig is configuration relevant to the leaderboard system.
 type LeaderboardConfig struct {
-	BlacklistRankCache []string `yaml:"blacklist_rank_cache" json:"blacklist_rank_cache" usage:"Disable rank cache for leaderboards with matching identifiers. To disable rank cache entirely, use '*', otherwise leave blank to enable rank cache."`
+	BlacklistRankCache   []string `yaml:"blacklist_rank_cache" json:"blacklist_rank_cache" usage:"Disable rank cache for leaderboards with matching identifiers. To disable rank cache entirely, use '*', otherwise leave blank to enable rank cache."`
+	CallbackQueueSize    int      `yaml:"callback_queue_size" json:"callback_queue_size" usage:"Size of the leaderboard and tournament callback queue that sequences expiry/reset/end invocations. Default 65536."`
+	CallbackQueueWorkers int      `yaml:"callback_queue_workers" json:"callback_queue_workers" usage:"Number of workers to use for concurrent processing of leaderboard and tournament callbacks. Default 8."`
 }
 
 // NewLeaderboardConfig creates a new LeaderboardConfig struct.
 func NewLeaderboardConfig() *LeaderboardConfig {
 	return &LeaderboardConfig{
-		BlacklistRankCache: []string{},
+		BlacklistRankCache:   []string{},
+		CallbackQueueSize:    65536,
+		CallbackQueueWorkers: 8,
 	}
 }

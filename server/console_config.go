@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/heroiclabs/nakama/console"
+	"github.com/heroiclabs/nakama/v2/console"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -39,15 +39,15 @@ func (s *ConsoleServer) GetConfig(ctx context.Context, in *empty.Empty) (*consol
 
 	cfg.GetConsole().Password = ObfuscationString
 	for i, address := range cfg.GetDatabase().Addresses {
-		rawUrl := fmt.Sprintf("postgresql://%s", address)
-		parsedUrl, err := url.Parse(rawUrl)
+		rawURL := fmt.Sprintf("postgresql://%s", address)
+		parsedURL, err := url.Parse(rawURL)
 		if err != nil {
 			s.logger.Error("Error parsing database address in config.", zap.Error(err))
 			return nil, status.Error(codes.Internal, "Error processing config.")
 		}
-		if parsedUrl.User != nil {
-			if password, isSet := parsedUrl.User.Password(); isSet {
-				cfg.GetDatabase().Addresses[i] = strings.ReplaceAll(address, parsedUrl.User.Username()+":"+password, parsedUrl.User.Username()+":"+ObfuscationString)
+		if parsedURL.User != nil {
+			if password, isSet := parsedURL.User.Password(); isSet {
+				cfg.GetDatabase().Addresses[i] = strings.ReplaceAll(address, parsedURL.User.Username()+":"+password, parsedURL.User.Username()+":"+ObfuscationString)
 			}
 		}
 	}

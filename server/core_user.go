@@ -22,7 +22,7 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/heroiclabs/nakama/api"
+	"github.com/heroiclabs/nakama-common/api"
 	"github.com/jackc/pgx/pgtype"
 	"go.uber.org/zap"
 )
@@ -39,7 +39,7 @@ WHERE`
 	facebookStatements := make([]string, 0, len(fbIDs))
 	params := make([]interface{}, 0)
 	counter := 1
-	useSqlOr := false
+	useSQLOr := false
 
 	if len(ids) > 0 {
 		for _, id := range ids {
@@ -49,7 +49,7 @@ WHERE`
 			counter++
 		}
 		query = query + " id IN (" + strings.Join(idStatements, ", ") + ")"
-		useSqlOr = true
+		useSQLOr = true
 	}
 
 	if len(usernames) > 0 {
@@ -59,11 +59,11 @@ WHERE`
 			usernameStatements = append(usernameStatements, statement)
 			counter++
 		}
-		if useSqlOr {
+		if useSQLOr {
 			query = query + " OR"
 		}
 		query = query + " username IN (" + strings.Join(usernameStatements, ", ") + ")"
-		useSqlOr = true
+		useSQLOr = true
 	}
 
 	if len(fbIDs) > 0 {
@@ -73,7 +73,7 @@ WHERE`
 			facebookStatements = append(facebookStatements, statement)
 			counter++
 		}
-		if useSqlOr {
+		if useSQLOr {
 			query = query + " OR"
 		}
 		query = query + " facebook_id IN (" + strings.Join(facebookStatements, ", ") + ")"

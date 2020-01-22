@@ -16,11 +16,12 @@ package server
 
 import (
 	"context"
-	"go.uber.org/atomic"
 	"sync"
 
+	"go.uber.org/atomic"
+
 	"github.com/gofrs/uuid"
-	"github.com/heroiclabs/nakama/rtapi"
+	"github.com/heroiclabs/nakama-common/rtapi"
 	"go.uber.org/zap"
 )
 
@@ -35,6 +36,7 @@ type Session interface {
 	Logger() *zap.Logger
 	ID() uuid.UUID
 	UserID() uuid.UUID
+	Vars() map[string]string
 	ClientIP() string
 	ClientPort() string
 

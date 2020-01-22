@@ -58,7 +58,7 @@ func NewSocketWsAcceptor(logger *zap.Logger, config Config, sessionRegistry Sess
 			http.Error(w, "Missing or invalid token", 401)
 			return
 		}
-		userID, username, expiry, ok := parseToken([]byte(config.GetSession().EncryptionKey), token)
+		userID, username, vars, expiry, ok := parseToken([]byte(config.GetSession().EncryptionKey), token)
 		if !ok {
 			http.Error(w, "Missing or invalid token", 401)
 			return
@@ -85,7 +85,7 @@ func NewSocketWsAcceptor(logger *zap.Logger, config Config, sessionRegistry Sess
 		_, span := trace.StartSpan(SocketWsStatsCtx, "nakama.session.ws")
 
 		// Wrap the connection for application handling.
-		session := NewSessionWS(logger, config, format, userID, username, expiry, clientIP, clientPort, jsonpbMarshaler, jsonpbUnmarshaler, conn, sessionRegistry, matchmaker, tracker, pipeline, runtime)
+		session := NewSessionWS(logger, config, format, userID, username, vars, expiry, clientIP, clientPort, jsonpbMarshaler, jsonpbUnmarshaler, conn, sessionRegistry, matchmaker, tracker, pipeline, runtime)
 
 		// Add to the session registry.
 		sessionRegistry.Add(session)
@@ -101,6 +101,6 @@ func NewSocketWsAcceptor(logger *zap.Logger, config Config, sessionRegistry Sess
 
 		// Mark the end of the session.
 		span.End()
-		stats.Record(SocketWsStatsCtx, MetricsSocketWsTimeSpentMsec.M(float64(time.Now().UTC().UnixNano()-startNanos)/1000), MetricsSocketWsCloseCount.M(1))
+		stats.Record(SocketWsStatsCtx, MetricsSocketWsTimeSpentMsec.M(float64(time.Now().UTC().UnixNano()-startNanos)/1e6), MetricsSocketWsCloseCount.M(1))
 	}
 }

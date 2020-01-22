@@ -22,10 +22,10 @@ import (
 	"encoding/json"
 	"github.com/gofrs/uuid"
 	"github.com/golang/protobuf/jsonpb"
-	"github.com/heroiclabs/nakama/api"
-	"github.com/heroiclabs/nakama/apigrpc"
-	"github.com/heroiclabs/nakama/rtapi"
-	"github.com/heroiclabs/nakama/server"
+	"github.com/heroiclabs/nakama-common/api"
+	"github.com/heroiclabs/nakama-common/rtapi"
+	"github.com/heroiclabs/nakama/v2/apigrpc"
+	"github.com/heroiclabs/nakama/v2/server"
 	_ "github.com/jackc/pgx/stdlib"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -50,12 +50,17 @@ var (
 	}
 )
 
+func init() {
+	_ = server.CheckConfig(logger, config)
+}
+
 type DummyMessageRouter struct{}
 
 func (d *DummyMessageRouter) SendDeferred(*zap.Logger, []*server.DeferredMessage) {
 	panic("unused")
 }
-func (d *DummyMessageRouter) SendToPresenceIDs(*zap.Logger, []*server.PresenceID, *rtapi.Envelope, bool) {}
+func (d *DummyMessageRouter) SendToPresenceIDs(*zap.Logger, []*server.PresenceID, *rtapi.Envelope, bool) {
+}
 func (d *DummyMessageRouter) SendToStream(*zap.Logger, server.PresenceStream, *rtapi.Envelope, bool) {}
 
 type DummySession struct {
@@ -76,6 +81,9 @@ func (d *DummySession) Username() string {
 	return ""
 }
 func (d *DummySession) SetUsername(string) {}
+func (d *DummySession) Vars() map[string]string {
+	return nil
+}
 func (d *DummySession) Expiry() int64 {
 	return int64(0)
 }

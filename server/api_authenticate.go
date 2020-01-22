@@ -15,16 +15,18 @@
 package server
 
 import (
-	"go.uber.org/zap"
+	"context"
+	"errors"
 	"math/rand"
 	"regexp"
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gofrs/uuid"
-	"github.com/heroiclabs/nakama/api"
-	"golang.org/x/net/context"
+	"github.com/heroiclabs/nakama-common/api"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -34,11 +36,29 @@ var (
 	emailRegex        = regexp.MustCompile("^.+@.+\\..+$")
 )
 
+type SessionTokenClaims struct {
+	UserId    string            `json:"uid,omitempty"`
+	Username  string            `json:"usn,omitempty"`
+	Vars      map[string]string `json:"vrs,omitempty"`
+	ExpiresAt int64             `json:"exp,omitempty"`
+}
+
+func (stc *SessionTokenClaims) Valid() error {
+	// Verify expiry.
+	if stc.ExpiresAt <= time.Now().UTC().Unix() {
+		vErr := new(jwt.ValidationError)
+		vErr.Inner = errors.New("Token is expired")
+		vErr.Errors |= jwt.ValidationErrorExpired
+		return vErr
+	}
+	return nil
+}
+
 func (s *ApiServer) AuthenticateCustom(ctx context.Context, in *api.AuthenticateCustomRequest) (*api.Session, error) {
 	// Before hook.
 	if fn := s.runtime.BeforeAuthenticateCustom(); fn != nil {
 		beforeFn := func(clientIP, clientPort string) error {
-			result, err, code := fn(ctx, s.logger, "", "", 0, clientIP, clientPort, in)
+			result, err, code := fn(ctx, s.logger, "", "", nil, 0, clientIP, clientPort, in)
 			if err != nil {
 				return status.Error(code, err.Error())
 			}
@@ -82,13 +102,13 @@ func (s *ApiServer) AuthenticateCustom(ctx context.Context, in *api.Authenticate
 		return nil, err
 	}
 
-	token, exp := generateToken(s.config, dbUserID, dbUsername)
+	token, exp := generateToken(s.config, dbUserID, dbUsername, in.Account.Vars)
 	session := &api.Session{Created: created, Token: token}
 
 	// After hook.
 	if fn := s.runtime.AfterAuthenticateCustom(); fn != nil {
 		afterFn := func(clientIP, clientPort string) {
-			fn(ctx, s.logger, dbUserID, dbUsername, exp, clientIP, clientPort, session, in)
+			fn(ctx, s.logger, dbUserID, dbUsername, in.Account.Vars, exp, clientIP, clientPort, session, in)
 		}
 
 		// Execute the after function lambda wrapped in a trace for stats measurement.
@@ -102,7 +122,7 @@ func (s *ApiServer) AuthenticateDevice(ctx context.Context, in *api.Authenticate
 	// Before hook.
 	if fn := s.runtime.BeforeAuthenticateDevice(); fn != nil {
 		beforeFn := func(clientIP, clientPort string) error {
-			result, err, code := fn(ctx, s.logger, "", "", 0, clientIP, clientPort, in)
+			result, err, code := fn(ctx, s.logger, "", "", nil, 0, clientIP, clientPort, in)
 			if err != nil {
 				return status.Error(code, err.Error())
 			}
@@ -146,13 +166,13 @@ func (s *ApiServer) AuthenticateDevice(ctx context.Context, in *api.Authenticate
 		return nil, err
 	}
 
-	token, exp := generateToken(s.config, dbUserID, dbUsername)
+	token, exp := generateToken(s.config, dbUserID, dbUsername, in.Account.Vars)
 	session := &api.Session{Created: created, Token: token}
 
 	// After hook.
 	if fn := s.runtime.AfterAuthenticateDevice(); fn != nil {
 		afterFn := func(clientIP, clientPort string) {
-			fn(ctx, s.logger, dbUserID, dbUsername, exp, clientIP, clientPort, session, in)
+			fn(ctx, s.logger, dbUserID, dbUsername, in.Account.Vars, exp, clientIP, clientPort, session, in)
 		}
 
 		// Execute the after function lambda wrapped in a trace for stats measurement.
@@ -166,7 +186,7 @@ func (s *ApiServer) AuthenticateEmail(ctx context.Context, in *api.AuthenticateE
 	// Before hook.
 	if fn := s.runtime.BeforeAuthenticateEmail(); fn != nil {
 		beforeFn := func(clientIP, clientPort string) error {
-			result, err, code := fn(ctx, s.logger, "", "", 0, clientIP, clientPort, in)
+			result, err, code := fn(ctx, s.logger, "", "", nil, 0, clientIP, clientPort, in)
 			if err != nil {
 				return status.Error(code, err.Error())
 			}
@@ -204,7 +224,7 @@ func (s *ApiServer) AuthenticateEmail(ctx context.Context, in *api.AuthenticateE
 	}
 
 	if len(email.Password) < 8 {
-		return nil, status.Error(codes.InvalidArgument, "Password must be longer than 8 characters.")
+		return nil, status.Error(codes.InvalidArgument, "Password must be at least 8 characters long.")
 	}
 
 	username := in.Username
@@ -240,13 +260,13 @@ func (s *ApiServer) AuthenticateEmail(ctx context.Context, in *api.AuthenticateE
 		return nil, err
 	}
 
-	token, exp := generateToken(s.config, dbUserID, username)
+	token, exp := generateToken(s.config, dbUserID, username, in.Account.Vars)
 	session := &api.Session{Created: created, Token: token}
 
 	// After hook.
 	if fn := s.runtime.AfterAuthenticateEmail(); fn != nil {
 		afterFn := func(clientIP, clientPort string) {
-			fn(ctx, s.logger, dbUserID, username, exp, clientIP, clientPort, session, in)
+			fn(ctx, s.logger, dbUserID, username, in.Account.Vars, exp, clientIP, clientPort, session, in)
 		}
 
 		// Execute the after function lambda wrapped in a trace for stats measurement.
@@ -260,7 +280,7 @@ func (s *ApiServer) AuthenticateFacebook(ctx context.Context, in *api.Authentica
 	// Before hook.
 	if fn := s.runtime.BeforeAuthenticateFacebook(); fn != nil {
 		beforeFn := func(clientIP, clientPort string) error {
-			result, err, code := fn(ctx, s.logger, "", "", 0, clientIP, clientPort, in)
+			result, err, code := fn(ctx, s.logger, "", "", nil, 0, clientIP, clientPort, in)
 			if err != nil {
 				return status.Error(code, err.Error())
 			}
@@ -305,13 +325,13 @@ func (s *ApiServer) AuthenticateFacebook(ctx context.Context, in *api.Authentica
 		importFacebookFriends(ctx, s.logger, s.db, s.router, s.socialClient, uuid.FromStringOrNil(dbUserID), dbUsername, in.Account.Token, false)
 	}
 
-	token, exp := generateToken(s.config, dbUserID, dbUsername)
+	token, exp := generateToken(s.config, dbUserID, dbUsername, in.Account.Vars)
 	session := &api.Session{Created: created, Token: token}
 
 	// After hook.
 	if fn := s.runtime.AfterAuthenticateFacebook(); fn != nil {
 		afterFn := func(clientIP, clientPort string) {
-			fn(ctx, s.logger, dbUserID, dbUsername, exp, clientIP, clientPort, session, in)
+			fn(ctx, s.logger, dbUserID, dbUsername, in.Account.Vars, exp, clientIP, clientPort, session, in)
 		}
 
 		// Execute the after function lambda wrapped in a trace for stats measurement.
@@ -325,7 +345,7 @@ func (s *ApiServer) AuthenticateGameCenter(ctx context.Context, in *api.Authenti
 	// Before hook.
 	if fn := s.runtime.BeforeAuthenticateGameCenter(); fn != nil {
 		beforeFn := func(clientIP, clientPort string) error {
-			result, err, code := fn(ctx, s.logger, "", "", 0, clientIP, clientPort, in)
+			result, err, code := fn(ctx, s.logger, "", "", nil, 0, clientIP, clientPort, in)
 			if err != nil {
 				return status.Error(code, err.Error())
 			}
@@ -377,13 +397,13 @@ func (s *ApiServer) AuthenticateGameCenter(ctx context.Context, in *api.Authenti
 		return nil, err
 	}
 
-	token, exp := generateToken(s.config, dbUserID, dbUsername)
+	token, exp := generateToken(s.config, dbUserID, dbUsername, in.Account.Vars)
 	session := &api.Session{Created: created, Token: token}
 
 	// After hook.
 	if fn := s.runtime.AfterAuthenticateGameCenter(); fn != nil {
 		afterFn := func(clientIP, clientPort string) {
-			fn(ctx, s.logger, dbUserID, dbUsername, exp, clientIP, clientPort, session, in)
+			fn(ctx, s.logger, dbUserID, dbUsername, in.Account.Vars, exp, clientIP, clientPort, session, in)
 		}
 
 		// Execute the after function lambda wrapped in a trace for stats measurement.
@@ -397,7 +417,7 @@ func (s *ApiServer) AuthenticateGoogle(ctx context.Context, in *api.Authenticate
 	// Before hook.
 	if fn := s.runtime.BeforeAuthenticateGoogle(); fn != nil {
 		beforeFn := func(clientIP, clientPort string) error {
-			result, err, code := fn(ctx, s.logger, "", "", 0, clientIP, clientPort, in)
+			result, err, code := fn(ctx, s.logger, "", "", nil, 0, clientIP, clientPort, in)
 			if err != nil {
 				return status.Error(code, err.Error())
 			}
@@ -437,13 +457,13 @@ func (s *ApiServer) AuthenticateGoogle(ctx context.Context, in *api.Authenticate
 		return nil, err
 	}
 
-	token, exp := generateToken(s.config, dbUserID, dbUsername)
+	token, exp := generateToken(s.config, dbUserID, dbUsername, in.Account.Vars)
 	session := &api.Session{Created: created, Token: token}
 
 	// After hook.
 	if fn := s.runtime.AfterAuthenticateGoogle(); fn != nil {
 		afterFn := func(clientIP, clientPort string) {
-			fn(ctx, s.logger, dbUserID, dbUsername, exp, clientIP, clientPort, session, in)
+			fn(ctx, s.logger, dbUserID, dbUsername, in.Account.Vars, exp, clientIP, clientPort, session, in)
 		}
 
 		// Execute the after function lambda wrapped in a trace for stats measurement.
@@ -457,7 +477,7 @@ func (s *ApiServer) AuthenticateSteam(ctx context.Context, in *api.AuthenticateS
 	// Before hook.
 	if fn := s.runtime.BeforeAuthenticateSteam(); fn != nil {
 		beforeFn := func(clientIP, clientPort string) error {
-			result, err, code := fn(ctx, s.logger, "", "", 0, clientIP, clientPort, in)
+			result, err, code := fn(ctx, s.logger, "", "", nil, 0, clientIP, clientPort, in)
 			if err != nil {
 				return status.Error(code, err.Error())
 			}
@@ -501,13 +521,13 @@ func (s *ApiServer) AuthenticateSteam(ctx context.Context, in *api.AuthenticateS
 		return nil, err
 	}
 
-	token, exp := generateToken(s.config, dbUserID, dbUsername)
+	token, exp := generateToken(s.config, dbUserID, dbUsername, in.Account.Vars)
 	session := &api.Session{Created: created, Token: token}
 
 	// After hook.
 	if fn := s.runtime.AfterAuthenticateSteam(); fn != nil {
 		afterFn := func(clientIP, clientPort string) {
-			fn(ctx, s.logger, dbUserID, dbUsername, exp, clientIP, clientPort, session, in)
+			fn(ctx, s.logger, dbUserID, dbUsername, in.Account.Vars, exp, clientIP, clientPort, session, in)
 		}
 
 		// Execute the after function lambda wrapped in a trace for stats measurement.
@@ -517,16 +537,17 @@ func (s *ApiServer) AuthenticateSteam(ctx context.Context, in *api.AuthenticateS
 	return session, nil
 }
 
-func generateToken(config Config, userID, username string) (string, int64) {
+func generateToken(config Config, userID, username string, vars map[string]string) (string, int64) {
 	exp := time.Now().UTC().Add(time.Duration(config.GetSession().TokenExpirySec) * time.Second).Unix()
-	return generateTokenWithExpiry(config, userID, username, exp)
+	return generateTokenWithExpiry(config, userID, username, vars, exp)
 }
 
-func generateTokenWithExpiry(config Config, userID, username string, exp int64) (string, int64) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"uid": userID,
-		"exp": exp,
-		"usn": username,
+func generateTokenWithExpiry(config Config, userID, username string, vars map[string]string, exp int64) (string, int64) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &SessionTokenClaims{
+		UserId:    userID,
+		Username:  username,
+		Vars:      vars,
+		ExpiresAt: exp,
 	})
 	signedToken, _ := token.SignedString([]byte(config.GetSession().EncryptionKey))
 	return signedToken, exp

@@ -30,7 +30,7 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
-	"github.com/heroiclabs/nakama/console"
+	"github.com/heroiclabs/nakama/v2/console"
 	"go.opencensus.io/plugin/ocgrpc"
 	"go.opencensus.io/zpages"
 	"go.uber.org/zap"
@@ -40,11 +40,16 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+var (
+	consoleAuthRequired = []byte(`{"error":"Console authentication required.","message":"Console authentication required.","code":16}`)
+)
+
 type ConsoleServer struct {
 	logger            *zap.Logger
 	db                *sql.DB
 	config            Config
 	tracker           Tracker
+	router            MessageRouter
 	statusHandler     StatusHandler
 	configWarnings    map[string]string
 	serverVersion     string
@@ -52,7 +57,7 @@ type ConsoleServer struct {
 	grpcGatewayServer *http.Server
 }
 
-func StartConsoleServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.DB, config Config, tracker Tracker, statusHandler StatusHandler, configWarnings map[string]string, serverVersion string) *ConsoleServer {
+func StartConsoleServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.DB, config Config, tracker Tracker, router MessageRouter, statusHandler StatusHandler, configWarnings map[string]string, serverVersion string) *ConsoleServer {
 	var gatewayContextTimeoutMs string
 	if config.GetConsole().IdleTimeoutMs > 500 {
 		// Ensure the GRPC Gateway timeout is just under the idle timeout (if possible) to ensure it has priority.
@@ -73,6 +78,7 @@ func StartConsoleServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.D
 		db:             db,
 		config:         config,
 		tracker:        tracker,
+		router:         router,
 		statusHandler:  statusHandler,
 		configWarnings: configWarnings,
 		serverVersion:  serverVersion,
@@ -94,17 +100,7 @@ func StartConsoleServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.D
 
 	ctx := context.Background()
 	grpcGateway := runtime.NewServeMux()
-	dialAddr := fmt.Sprintf("127.0.0.1:%d", config.GetConsole().Port-3)
-	if config.GetConsole().Address != "" {
-		dialAddr = fmt.Sprintf("%v:%d", config.GetConsole().Address, config.GetConsole().Port-3)
-	}
-	dialOpts := []grpc.DialOption{
-		//TODO (mo, zyro): Do we need to pass the statsHandler here as well?
-		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(int(config.GetConsole().MaxMessageSizeBytes))),
-		grpc.WithInsecure(),
-	}
-
-	if err := console.RegisterConsoleHandlerFromEndpoint(ctx, grpcGateway, dialAddr, dialOpts); err != nil {
+	if err := console.RegisterConsoleHandlerServer(ctx, grpcGateway, s); err != nil {
 		startupLogger.Fatal("Console server gateway registration failed", zap.Error(err))
 	}
 
@@ -123,9 +119,31 @@ func StartConsoleServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.D
 
 	grpcGatewayRouter.HandleFunc("/v2/console/storage/import", s.importStorage)
 
+	grpcGatewaySecure := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v2/console/authenticate":
+			// Authentication endpoint doesn't require security.
+			grpcGateway.ServeHTTP(w, r)
+		default:
+			// All other endpoints are secured.
+			auth, ok := r.Header["Authorization"]
+			if !ok || len(auth) != 1 || !checkAuth(config, auth[0]) {
+				// Auth token not valid or expired.
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Header().Set("content-type", "application/json")
+				_, err := w.Write(consoleAuthRequired)
+				if err != nil {
+					s.logger.Debug("Error writing response to client", zap.Error(err))
+				}
+				return
+			}
+			grpcGateway.ServeHTTP(w, r)
+		}
+	})
+
 	// Enable max size check on requests coming arriving the gateway.
 	// Enable compression on responses sent by the gateway.
-	handlerWithCompressResponse := handlers.CompressHandler(grpcGateway)
+	handlerWithCompressResponse := handlers.CompressHandler(grpcGatewaySecure)
 	maxMessageSizeBytes := config.GetConsole().MaxMessageSizeBytes
 	handlerWithMaxBody := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check max body size before decompressing incoming request body.

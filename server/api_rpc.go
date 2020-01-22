@@ -15,6 +15,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -23,9 +24,8 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/gorilla/mux"
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
-	"github.com/heroiclabs/nakama/api"
+	"github.com/heroiclabs/nakama-common/api"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -35,10 +35,10 @@ var (
 	authTokenInvalidBytes    = []byte(`{"error":"Auth token invalid","message":"Auth token invalid","code":16}`)
 	httpKeyInvalidBytes      = []byte(`{"error":"HTTP key invalid","message":"HTTP key invalid","code":16}`)
 	noAuthBytes              = []byte(`{"error":"Auth token or HTTP key required","message":"Auth token or HTTP key required","code":16}`)
-	rpcIdMustBeSetBytes      = []byte(`{"error":"RPC ID must be set","message":"RPC ID must be set","code":3}`)
+	rpcIDMustBeSetBytes      = []byte(`{"error":"RPC ID must be set","message":"RPC ID must be set","code":3}`)
 	rpcFunctionNotFoundBytes = []byte(`{"error":"RPC function not found","message":"RPC function not found","code":5}`)
 	internalServerErrorBytes = []byte(`{"error":"Internal Server Error","message":"Internal Server Error","code":13}`)
-	badJsonBytes             = []byte(`{"error":"json: cannot unmarshal object into Go value of type string","message":"json: cannot unmarshal object into Go value of type string","code":3}`)
+	badJSONBytes             = []byte(`{"error":"json: cannot unmarshal object into Go value of type string","message":"json: cannot unmarshal object into Go value of type string","code":3}`)
 )
 
 func (s *ApiServer) RpcFuncHttp(w http.ResponseWriter, r *http.Request) {
@@ -47,9 +47,10 @@ func (s *ApiServer) RpcFuncHttp(w http.ResponseWriter, r *http.Request) {
 	var tokenAuth bool
 	var userID uuid.UUID
 	var username string
+	var vars map[string]string
 	var expiry int64
 	if auth := r.Header["Authorization"]; len(auth) >= 1 {
-		userID, username, expiry, tokenAuth = parseBearerAuth([]byte(s.config.GetSession().EncryptionKey), auth[0])
+		userID, username, vars, expiry, tokenAuth = parseBearerAuth([]byte(s.config.GetSession().EncryptionKey), auth[0])
 		if !tokenAuth {
 			// Auth token not valid or expired.
 			w.WriteHeader(http.StatusUnauthorized)
@@ -83,18 +84,18 @@ func (s *ApiServer) RpcFuncHttp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check the RPC function ID.
-	maybeId, ok := mux.Vars(r)["id"]
-	if !ok || maybeId == "" {
+	maybeID, ok := mux.Vars(r)["id"]
+	if !ok || maybeID == "" {
 		// Missing RPC function ID.
 		w.WriteHeader(http.StatusBadRequest)
 		w.Header().Set("content-type", "application/json")
-		_, err := w.Write(rpcIdMustBeSetBytes)
+		_, err := w.Write(rpcIDMustBeSetBytes)
 		if err != nil {
 			s.logger.Debug("Error writing response to client", zap.Error(err))
 		}
 		return
 	}
-	id := strings.ToLower(maybeId)
+	id := strings.ToLower(maybeID)
 
 	// Find the correct RPC function.
 	fn := s.runtime.Rpc(id)
@@ -135,7 +136,7 @@ func (s *ApiServer) RpcFuncHttp(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				w.Header().Set("content-type", "application/json")
-				_, err := w.Write(badJsonBytes)
+				_, err := w.Write(badJSONBytes)
 				if err != nil {
 					s.logger.Debug("Error writing response to client", zap.Error(err))
 				}
@@ -156,7 +157,7 @@ func (s *ApiServer) RpcFuncHttp(w http.ResponseWriter, r *http.Request) {
 	clientIP, clientPort := extractClientAddressFromRequest(s.logger, r)
 
 	// Execute the function.
-	result, fnErr, code := fn(r.Context(), queryParams, uid, username, expiry, "", clientIP, clientPort, payload)
+	result, fnErr, code := fn(r.Context(), queryParams, uid, username, vars, expiry, "", clientIP, clientPort, payload)
 	if fnErr != nil {
 		response, _ := json.Marshal(map[string]interface{}{"error": fnErr, "message": fnErr.Error(), "code": code})
 		w.WriteHeader(runtime.HTTPStatusFromCode(code))
@@ -190,6 +191,13 @@ func (s *ApiServer) RpcFuncHttp(w http.ResponseWriter, r *http.Request) {
 		response = []byte(result)
 	}
 	w.WriteHeader(http.StatusOK)
+	if contentType := r.Header["Content-Type"]; unwrap && len(contentType) > 0 {
+		// Assume the request input content type is the same as the expected response.
+		w.Header().Set("content-type", contentType[0])
+	} else {
+		// Fall back to default response content type application/json.
+		w.Header().Set("content-type", "application/json")
+	}
 	_, err := w.Write(response)
 	if err != nil {
 		s.logger.Debug("Error writing response to client", zap.Error(err))
@@ -209,19 +217,20 @@ func (s *ApiServer) RpcFunc(ctx context.Context, in *api.Rpc) (*api.Rpc, error) 
 	}
 
 	queryParams := make(map[string][]string, 0)
-	if md, ok := metadata.FromIncomingContext(ctx); !ok {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
 		return nil, status.Error(codes.Internal, "RPC function could not get incoming context")
-	} else {
-		for k, vs := range md {
-			// Only process the keys representing custom query parameters.
-			if strings.HasPrefix(k, "q_") {
-				queryParams[k[2:]] = vs
-			}
+	}
+	for k, vs := range md {
+		// Only process the keys representing custom query parameters.
+		if strings.HasPrefix(k, "q_") {
+			queryParams[k[2:]] = vs
 		}
 	}
 
 	uid := ""
 	username := ""
+	var vars map[string]string
 	expiry := int64(0)
 	if u := ctx.Value(ctxUserIDKey{}); u != nil {
 		uid = u.(uuid.UUID).String()
@@ -229,13 +238,16 @@ func (s *ApiServer) RpcFunc(ctx context.Context, in *api.Rpc) (*api.Rpc, error) 
 	if u := ctx.Value(ctxUsernameKey{}); u != nil {
 		username = u.(string)
 	}
+	if v := ctx.Value(ctxVarsKey{}); v != nil {
+		vars = v.(map[string]string)
+	}
 	if e := ctx.Value(ctxExpiryKey{}); e != nil {
 		expiry = e.(int64)
 	}
 
 	clientIP, clientPort := extractClientAddressFromContext(s.logger, ctx)
 
-	result, fnErr, code := fn(ctx, queryParams, uid, username, expiry, "", clientIP, clientPort, in.Payload)
+	result, fnErr, code := fn(ctx, queryParams, uid, username, vars, expiry, "", clientIP, clientPort, in.Payload)
 	if fnErr != nil {
 		return nil, status.Error(code, fnErr.Error())
 	}

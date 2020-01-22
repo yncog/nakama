@@ -15,19 +15,21 @@
 package server
 
 import (
+	"context"
 	"crypto"
 	"database/sql"
 	"encoding/base64"
 	"fmt"
-	"go.opencensus.io/stats"
-	"go.opencensus.io/tag"
-	"go.opencensus.io/trace"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/heroiclabs/nakama/api"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/tag"
+	"go.opencensus.io/trace"
+
+	"github.com/heroiclabs/nakama-common/api"
 
 	"google.golang.org/grpc/peer"
 
@@ -43,12 +45,11 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	grpcRuntime "github.com/grpc-ecosystem/grpc-gateway/runtime"
-	"github.com/heroiclabs/nakama/apigrpc"
-	"github.com/heroiclabs/nakama/social"
+	"github.com/heroiclabs/nakama/v2/apigrpc"
+	"github.com/heroiclabs/nakama/v2/social"
 	"go.opencensus.io/plugin/ocgrpc"
 	"go.opencensus.io/plugin/ochttp"
 	"go.uber.org/zap"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -57,9 +58,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// Used as part of JSON input validation.
+const byteBracket byte = '{'
+
 // Keys used for storing/retrieving user information in the context of a request after authentication.
 type ctxUserIDKey struct{}
 type ctxUsernameKey struct{}
+type ctxVarsKey struct{}
 type ctxExpiryKey struct{}
 
 type ctxFullMethodKey struct{}
@@ -92,7 +97,7 @@ func StartApiServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.DB, j
 
 	serverOpts := []grpc.ServerOption{
 		grpc.StatsHandler(&ocgrpc.ServerHandler{IsPublicEndpoint: true}),
-		grpc.MaxRecvMsgSize(int(config.GetSocket().MaxMessageSizeBytes)),
+		grpc.MaxRecvMsgSize(int(config.GetSocket().MaxRequestSizeBytes)),
 		grpc.UnaryInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 			ctx, err := securityInterceptorFunc(logger, config, ctx, req, info)
 			if err != nil {
@@ -162,7 +167,10 @@ func StartApiServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.DB, j
 	}
 	dialOpts := []grpc.DialOption{
 		//TODO (mo, zyro): Do we need to pass the statsHandler here as well?
-		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(int(config.GetSocket().MaxMessageSizeBytes))),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallSendMsgSize(int(config.GetSocket().MaxRequestSizeBytes)),
+			grpc.MaxCallRecvMsgSize(1024*1024*128),
+		),
 		grpc.WithStatsHandler(&ocgrpc.ClientHandler{}),
 	}
 	if config.GetSocket().TLSCert != nil {
@@ -173,6 +181,9 @@ func StartApiServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.DB, j
 	if err := apigrpc.RegisterNakamaHandlerFromEndpoint(ctx, grpcGateway, dialAddr, dialOpts); err != nil {
 		startupLogger.Fatal("API server gateway registration failed", zap.Error(err))
 	}
+	//if err := apigrpc.RegisterNakamaHandlerServer(ctx, grpcGateway, s); err != nil {
+	//	startupLogger.Fatal("API server gateway registration failed", zap.Error(err))
+	//}
 
 	grpcGatewayRouter := mux.NewRouter()
 	// Special case routes. Do NOT enable compression on WebSocket route, it results in "http: response.Write on hijacked connection" errors.
@@ -198,7 +209,7 @@ func StartApiServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.DB, j
 	// Enable decompression on requests received by the gateway.
 	handlerWithDecompressRequest := decompressHandler(logger, handlerWithStats)
 	handlerWithCompressResponse := handlers.CompressHandler(handlerWithDecompressRequest)
-	maxMessageSizeBytes := config.GetSocket().MaxMessageSizeBytes
+	maxMessageSizeBytes := config.GetSocket().MaxRequestSizeBytes
 	handlerWithMaxBody := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check max body size before decompressing incoming request body.
 		r.Body = http.MaxBytesReader(w, r.Body, maxMessageSizeBytes)
@@ -345,12 +356,12 @@ func securityInterceptorFunc(logger *zap.Logger, config Config, ctx context.Cont
 			// Value of "authorization" or "grpc-authorization" was empty or repeated.
 			return nil, status.Error(codes.Unauthenticated, "Auth token invalid")
 		}
-		userID, username, exp, ok := parseBearerAuth([]byte(config.GetSession().EncryptionKey), auth[0])
+		userID, username, vars, exp, ok := parseBearerAuth([]byte(config.GetSession().EncryptionKey), auth[0])
 		if !ok {
 			// Value of "authorization" or "grpc-authorization" was malformed or expired.
 			return nil, status.Error(codes.Unauthenticated, "Auth token invalid")
 		}
-		ctx = context.WithValue(context.WithValue(context.WithValue(ctx, ctxUserIDKey{}, userID), ctxUsernameKey{}, username), ctxExpiryKey{}, exp)
+		ctx = context.WithValue(context.WithValue(context.WithValue(context.WithValue(ctx, ctxUserIDKey{}, userID), ctxUsernameKey{}, username), ctxVarsKey{}, vars), ctxExpiryKey{}, exp)
 	default:
 		// Unless explicitly defined above, handlers require full user authentication.
 		md, ok := metadata.FromIncomingContext(ctx)
@@ -370,12 +381,12 @@ func securityInterceptorFunc(logger *zap.Logger, config Config, ctx context.Cont
 			// Value of "authorization" or "grpc-authorization" was empty or repeated.
 			return nil, status.Error(codes.Unauthenticated, "Auth token invalid")
 		}
-		userID, username, exp, ok := parseBearerAuth([]byte(config.GetSession().EncryptionKey), auth[0])
+		userID, username, vars, exp, ok := parseBearerAuth([]byte(config.GetSession().EncryptionKey), auth[0])
 		if !ok {
 			// Value of "authorization" or "grpc-authorization" was malformed or expired.
 			return nil, status.Error(codes.Unauthenticated, "Auth token invalid")
 		}
-		ctx = context.WithValue(context.WithValue(context.WithValue(ctx, ctxUserIDKey{}, userID), ctxUsernameKey{}, username), ctxExpiryKey{}, exp)
+		ctx = context.WithValue(context.WithValue(context.WithValue(context.WithValue(ctx, ctxUserIDKey{}, userID), ctxUsernameKey{}, username), ctxVarsKey{}, vars), ctxExpiryKey{}, exp)
 	}
 	return context.WithValue(ctx, ctxFullMethodKey{}, info.FullMethod), nil
 }
@@ -400,7 +411,7 @@ func parseBasicAuth(auth string) (username, password string, ok bool) {
 	return cs[:s], cs[s+1:], true
 }
 
-func parseBearerAuth(hmacSecretByte []byte, auth string) (userID uuid.UUID, username string, exp int64, ok bool) {
+func parseBearerAuth(hmacSecretByte []byte, auth string) (userID uuid.UUID, username string, vars map[string]string, exp int64, ok bool) {
 	if auth == "" {
 		return
 	}
@@ -408,11 +419,11 @@ func parseBearerAuth(hmacSecretByte []byte, auth string) (userID uuid.UUID, user
 	if !strings.HasPrefix(auth, prefix) {
 		return
 	}
-	return parseToken(hmacSecretByte, string(auth[len(prefix):]))
+	return parseToken(hmacSecretByte, auth[len(prefix):])
 }
 
-func parseToken(hmacSecretByte []byte, tokenString string) (userID uuid.UUID, username string, exp int64, ok bool) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+func parseToken(hmacSecretByte []byte, tokenString string) (userID uuid.UUID, username string, vars map[string]string, exp int64, ok bool) {
+	token, err := jwt.ParseWithClaims(tokenString, &SessionTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		if s, ok := token.Method.(*jwt.SigningMethodHMAC); !ok || s.Hash != crypto.SHA256 {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
@@ -421,15 +432,15 @@ func parseToken(hmacSecretByte []byte, tokenString string) (userID uuid.UUID, us
 	if err != nil {
 		return
 	}
-	claims, ok := token.Claims.(jwt.MapClaims)
+	claims, ok := token.Claims.(*SessionTokenClaims)
 	if !ok || !token.Valid {
 		return
 	}
-	userID, err = uuid.FromString(claims["uid"].(string))
+	userID, err = uuid.FromString(claims.UserId)
 	if err != nil {
 		return
 	}
-	return userID, claims["usn"].(string), int64(claims["exp"].(float64)), true
+	return userID, claims.Username, claims.Vars, claims.ExpiresAt, true
 }
 
 func decompressHandler(logger *zap.Logger, h http.Handler) http.HandlerFunc {
@@ -517,7 +528,7 @@ func traceApiBefore(ctx context.Context, logger *zap.Logger, fullMethodName stri
 	err = fn(clientIP, clientPort)
 
 	span.End()
-	stats.Record(statsCtx, MetricsApiTimeSpentMsec.M(float64(time.Now().UTC().UnixNano()-startNanos)/1000), MetricsApiCount.M(1))
+	stats.Record(statsCtx, MetricsAPITimeSpentMsec.M(float64(time.Now().UTC().UnixNano()-startNanos)/1e6), MetricsAPICount.M(1))
 
 	return err
 }
@@ -538,5 +549,5 @@ func traceApiAfter(ctx context.Context, logger *zap.Logger, fullMethodName strin
 	fn(clientIP, clientPort)
 
 	span.End()
-	stats.Record(statsCtx, MetricsApiTimeSpentMsec.M(float64(time.Now().UTC().UnixNano()-startNanos)/1000), MetricsApiCount.M(1))
+	stats.Record(statsCtx, MetricsAPITimeSpentMsec.M(float64(time.Now().UTC().UnixNano()-startNanos)/1e6), MetricsAPICount.M(1))
 }

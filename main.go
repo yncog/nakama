@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"flag"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -24,6 +25,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -32,10 +34,10 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/golang/protobuf/jsonpb"
-	"github.com/heroiclabs/nakama/ga"
-	"github.com/heroiclabs/nakama/migrate"
-	"github.com/heroiclabs/nakama/server"
-	"github.com/heroiclabs/nakama/social"
+	"github.com/heroiclabs/nakama/v2/ga"
+	"github.com/heroiclabs/nakama/v2/migrate"
+	"github.com/heroiclabs/nakama/v2/server"
+	"github.com/heroiclabs/nakama/v2/social"
 	_ "github.com/jackc/pgx/stdlib"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -75,6 +77,23 @@ func main() {
 			return
 		case "migrate":
 			migrate.Parse(os.Args[2:], tmpLogger)
+		case "check":
+			// Parse any command line args to look up runtime path.
+			// Use full config structure even if not all of its options are available in this command.
+			config := server.NewConfig(tmpLogger)
+			var runtimePath string
+			flags := flag.NewFlagSet("check", flag.ExitOnError)
+			flags.StringVar(&runtimePath, "runtime.path", filepath.Join(config.GetDataDir(), "modules"), "Path for the server to scan for Lua and Go library files.")
+			if err := flags.Parse(os.Args[2:]); err != nil {
+				tmpLogger.Fatal("Could not parse check flags.")
+			}
+			config.GetRuntime().Path = runtimePath
+
+			if err := server.CheckRuntime(tmpLogger, config); err != nil {
+				// Errors are already logged in the function above.
+				os.Exit(1)
+			}
+			return
 		}
 	}
 
@@ -103,7 +122,7 @@ func main() {
 	router := server.NewLocalMessageRouter(sessionRegistry, tracker, jsonpbMarshaler)
 	leaderboardCache := server.NewLocalLeaderboardCache(logger, startupLogger, db)
 	leaderboardRankCache := server.NewLocalLeaderboardRankCache(startupLogger, db, config.GetLeaderboard(), leaderboardCache)
-	leaderboardScheduler := server.NewLocalLeaderboardScheduler(logger, db, leaderboardCache, leaderboardRankCache)
+	leaderboardScheduler := server.NewLocalLeaderboardScheduler(logger, db, config, leaderboardCache, leaderboardRankCache)
 	matchRegistry := server.NewLocalMatchRegistry(logger, startupLogger, config, tracker, router, config.GetName())
 	tracker.SetMatchJoinListener(matchRegistry.Join)
 	tracker.SetMatchLeaveListener(matchRegistry.Leave)
@@ -120,7 +139,7 @@ func main() {
 	metrics := server.NewMetrics(logger, startupLogger, config, metricsExporter)
 	statusHandler := server.NewLocalStatusHandler(logger, sessionRegistry, matchRegistry, tracker, metricsExporter, config.GetName())
 
-	consoleServer := server.StartConsoleServer(logger, startupLogger, db, config, tracker, statusHandler, configWarnings, semver)
+	consoleServer := server.StartConsoleServer(logger, startupLogger, db, config, tracker, router, statusHandler, configWarnings, semver)
 	apiServer := server.StartApiServer(logger, startupLogger, db, jsonpbMarshaler, jsonpbUnmarshaler, config, socialClient, leaderboardCache, leaderboardRankCache, sessionRegistry, matchRegistry, matchmaker, tracker, router, pipeline, runtime)
 
 	gaenabled := len(os.Getenv("NAKAMA_TELEMETRY")) < 1
@@ -192,32 +211,35 @@ func main() {
 }
 
 func dbConnect(multiLogger *zap.Logger, config server.Config) (*sql.DB, string) {
-	rawUrl := fmt.Sprintf("postgresql://%s", config.GetDatabase().Addresses[0])
-	parsedUrl, err := url.Parse(rawUrl)
+	rawURL := fmt.Sprintf("postgresql://%s", config.GetDatabase().Addresses[0])
+	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
 		multiLogger.Fatal("Bad database connection URL", zap.Error(err))
 	}
-	query := parsedUrl.Query()
+	query := parsedURL.Query()
 	if len(query.Get("sslmode")) == 0 {
 		query.Set("sslmode", "disable")
-		parsedUrl.RawQuery = query.Encode()
+		parsedURL.RawQuery = query.Encode()
 	}
 
-	if len(parsedUrl.User.Username()) < 1 {
-		parsedUrl.User = url.User("root")
+	if len(parsedURL.User.Username()) < 1 {
+		parsedURL.User = url.User("root")
 	}
-	if len(parsedUrl.Path) < 1 {
-		parsedUrl.Path = "/nakama"
+	if len(parsedURL.Path) < 1 {
+		parsedURL.Path = "/nakama"
 	}
 
-	multiLogger.Debug("Complete database connection URL", zap.String("raw_url", parsedUrl.String()))
-	db, err := sql.Open("pgx", parsedUrl.String())
+	multiLogger.Debug("Complete database connection URL", zap.String("raw_url", parsedURL.String()))
+	db, err := sql.Open("pgx", parsedURL.String())
 	if err != nil {
 		multiLogger.Fatal("Error connecting to database", zap.Error(err))
 	}
 	// Limit the time allowed to ping database and get version to 15 seconds total.
 	ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
 	if err = db.PingContext(ctx); err != nil {
+		if strings.HasSuffix(err.Error(), "does not exist (SQLSTATE 3D000)") {
+			multiLogger.Fatal("Database schema not found, run `nakama migrate up`", zap.Error(err))
+		}
 		multiLogger.Fatal("Error pinging database", zap.Error(err))
 	}
 

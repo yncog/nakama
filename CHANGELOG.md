@@ -4,8 +4,64 @@ All notable changes to this project are documented below.
 The format is based on [keep a changelog](http://keepachangelog.com) and this project uses [semantic versioning](http://semver.org).
 
 ## [Unreleased]
+
+
+## [2.9.1] - 2020-01-14
+### Changed
+- Build with Go 1.13.6 release.
+- Upgrade devconsole handlebars (4.3.0) dependency.
+
+### Fixed
+- Ensure tournament listing correctly uses the cursor on paginated requests.
+- Passthrough GRPC Gateway Console requests to GRPC internally with authentication middleware active.
+
+## [2.9.0] - 2019-12-23
 ### Added
-- Allow RPC functions to receive and return raw JSON data.
+- New runtime functions to retrieve tournaments by ID.
+- Allow tournament duration to exceed reset window and cap the duration if it does.
+- Ban group users which prevents them from rejoining or requesting to rejoin.
+- New config parameter for max request message size separate from socket message size limit.
+
+### Changed
+- Do not use absolute path for `tini` executable in default container entry point.
+- Faster validation of JSON object input payloads.
+- Update IAP validation example for Android Publisher v3 API.
+- Relayed multiplayer matches allow echoing messages back to sender if they're in the filter list.
+- Upgrade Facebook authentication to use version 5.0 of the Facebook Graph API.
+- Upgrade devconsole serialize-javascript (2.1.1) dependency.
+- Ensure authoritative match dispatcher is no longer usable after match stops.
+- Deferred message broadcasts now process just before match ends if match handler functions return an error.
+
+### Fixed
+- Correctly read pagination cursor in notification listings.
+- Group user add no longer sends another channel message when an add operation is repeated.
+- Importing Facebook friends when there are no friends and reset is true now works as expected.
+
+## [2.8.0] - 2019-11-11
+### Added
+- New API for client and runtime events known as event signals.
+- Allow user account password updates from the developer console.
+
+### Changed
+- Default runtime HTTP key value is no longer the same as the default server key value.
+- A group create operation now returns a GRPC Code 6 (HTTP 409 Conflict) when the group name is already in use.
+- Allow Console API requests to return results above default size limit.
+- The presence count is no longer added together across nodes in the status view of the Developer Console.
+- Create tournament operations always return the existing tournament after repeated calls with the same ID.
+- Upgrade to Go 1.13.4 and use Debian buster-slim for base docker images.
+- Rate limit the maximum number of concurrent leaderboard/tournament callback executions.
+- Allow Go runtime match listing operations min/max count to be optional.
+
+### Fixed
+- Handle (OCC) errors when concurrently writing new storage objects.
+- Fix optimistic concurrency controls (OCC) on individual storage objects under high write contention.
+- Time spent metrics are now correctly reported in milliseconds.
+- Password minimum length error message now correctly reflects the constraint.
+- Set specific response Content-Type header in successful HTTP RPC responses.
+
+## [2.7.0] - 2019-09-11
+### Added
+- Enable RPC functions to receive and return raw JSON data.
 - Status follow operations now also accept usernames to follow.
 - Pagination support for friends listing operations.
 - Filtering by friend state in friends listing operations.
@@ -14,10 +70,15 @@ The format is based on [keep a changelog](http://keepachangelog.com) and this pr
 - Pagination support for user groups listing operations.
 - Filtering by group state in user groups listing operations.
 - Allow max count to be set when creating groups from client calls.
+- Log better startup error message when database schema is not set up at all.
+- New "check" command to validate runtime modules without starting the server.
+- Add discrete channel identifier fields in all messages and message history listings.
+- Session tokens now allow storage of arbitrary string key-value pairs.
+- New runtime function for programmatic GDPR account data exports.
 
 ### Changed
-- Use Go 1.12.7 on Alpine 3.10 as base Docker container image and native builds.
-- Update devconsole lodash (4.17.13) and lodash.template (4.5.0) dependencies.
+- Use Go 1.13.0 on Alpine 3.10 as base Docker container image and native builds.
+- Update devconsole lodash (4.17.13), lodash.template (4.5.0), eslint-utils (1.4.1), set-value (2.0.1), and mixin-deep (1.3.2) dependencies.
 - Errors from runtime before hooks no longer close the session.
 - Switch prometheus metrics to use labels instead of a prefix.
 - Add flag on realtime socket messages that will support optional reliability.
@@ -27,6 +88,11 @@ The format is based on [keep a changelog](http://keepachangelog.com) and this pr
 - Group users listing now includes disabled (banned) users.
 - User groups listing now includes disabled groups.
 - Remove hard cap on maximum number of users per group.
+- Return deterministic ordering for edge relationship listings.
+- Return deterministic ordering for storage listing operations.
+- Return deterministic ordering for leaderboard scores where both score and subscore are identical.
+- Consistent default database address between migration command and main server startup.
+- Return deterministic ordering for group listings without filters.
 
 ### Fixed
 - Handle updates during leaderboard schedule reset window.
@@ -34,6 +100,16 @@ The format is based on [keep a changelog](http://keepachangelog.com) and this pr
 - Handle leaderboard deletes shortly before a scheduled reset.
 - Listing user groups no longer returns an error when the user is a member of zero groups.
 - Go runtime group creation now correctly validates max count.
+- Consistent expiry calculation in leaderboard records haystack queries.
+- Convert custom SQL query and exec parameters to integers when necessary in Lua runtime.
+- Correctly validate users before adding them to groups.
+- Add missing group chat channel message when a user joins the group.
+- Add missing group chat channel message when a user leaves the group.
+- Add missing group chat channel message when a user is added to the group.
+- Add missing group chat channel message when a user is kicked from the group.
+- Add missing group chat channel message when a user is promoted in the group.
+- Handle TIMESTAMPTZ return types in Lua runtime custom SQL queries.
+- Use consistent upper bound for authoritative match label size.
 
 ## [2.6.0] - 2019-07-01
 ### Added

@@ -25,8 +25,8 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/heroiclabs/nakama/api"
-	"github.com/heroiclabs/nakama/rtapi"
+	"github.com/heroiclabs/nakama-common/api"
+	"github.com/heroiclabs/nakama-common/rtapi"
 	"github.com/jackc/pgx/pgtype"
 	"go.uber.org/zap"
 	"time"
@@ -101,7 +101,7 @@ func NotificationList(ctx context.Context, logger *zap.Logger, db *sql.DB, userI
 SELECT id, subject, content, code, sender_id, create_time
 FROM notification
 WHERE user_id = $1`+cursorQuery+`
-ORDER BY create_time ASC`+limitQuery, params...)
+ORDER BY create_time ASC, id ASC`+limitQuery, params...)
 
 	if err != nil {
 		logger.Error("Could not retrieve notifications.", zap.Error(err))
