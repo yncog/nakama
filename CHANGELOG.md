@@ -4,7 +4,16 @@ All notable changes to this project are documented below.
 The format is based on [keep a changelog](http://keepachangelog.com) and this project uses [semantic versioning](http://semver.org).
 
 ## [Unreleased]
+### Added
+- New metric for number of authoritative matches currently running.
+- New metric for total number of events dropped by the events processor pool.
 
+### Changed
+- Update username on leaderboard and tournament records when processing a score update.
+- Automatically stop empty authoritative matches after a configurable amount of time.
+
+### Fixed
+- Correctly calculate 'can enter' field for newly created tournaments.
 
 ## [2.9.1] - 2020-01-14
 ### Changed
@@ -41,6 +50,7 @@ The format is based on [keep a changelog](http://keepachangelog.com) and this pr
 ### Added
 - New API for client and runtime events known as event signals.
 - Allow user account password updates from the developer console.
+- Runtime log messages are now tagged with their source runtime type.
 
 ### Changed
 - Default runtime HTTP key value is no longer the same as the default server key value.
