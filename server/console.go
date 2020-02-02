@@ -26,10 +26,10 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	grpc_gateway_runtime "github.com/grpc-ecosystem/grpc-gateway/runtime"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/heroiclabs/nakama/v2/console"
 	"go.opencensus.io/plugin/ocgrpc"
 	"go.opencensus.io/zpages"
@@ -53,11 +53,12 @@ type ConsoleServer struct {
 	statusHandler     StatusHandler
 	configWarnings    map[string]string
 	serverVersion     string
+	runtime           *Runtime
 	grpcServer        *grpc.Server
 	grpcGatewayServer *http.Server
 }
 
-func StartConsoleServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.DB, config Config, tracker Tracker, router MessageRouter, statusHandler StatusHandler, configWarnings map[string]string, serverVersion string) *ConsoleServer {
+func StartConsoleServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.DB, config Config, tracker Tracker, router MessageRouter, statusHandler StatusHandler, configWarnings map[string]string, serverVersion string, runtime *Runtime) *ConsoleServer {
 	var gatewayContextTimeoutMs string
 	if config.GetConsole().IdleTimeoutMs > 500 {
 		// Ensure the GRPC Gateway timeout is just under the idle timeout (if possible) to ensure it has priority.
@@ -82,6 +83,7 @@ func StartConsoleServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.D
 		statusHandler:  statusHandler,
 		configWarnings: configWarnings,
 		serverVersion:  serverVersion,
+		runtime:        runtime,
 		grpcServer:     grpcServer,
 	}
 
@@ -99,7 +101,7 @@ func StartConsoleServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.D
 	}()
 
 	ctx := context.Background()
-	grpcGateway := runtime.NewServeMux()
+	grpcGateway := grpc_gateway_runtime.NewServeMux()
 	if err := console.RegisterConsoleHandlerServer(ctx, grpcGateway, s); err != nil {
 		startupLogger.Fatal("Console server gateway registration failed", zap.Error(err))
 	}

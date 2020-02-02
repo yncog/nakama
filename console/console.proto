@@ -234,32 +234,15 @@ service Console {
     };
   }
 
-  rpc CreateTournament (CreateTournamentRequest) returns (TournamentId) {
+  // Execute a Lua function on the server.
+  rpc RpcFunc (api.Rpc) returns (api.Rpc) {
     option (google.api.http) = {
-      post: "/v2/console/tournament",
-      body: "*"
+      post: "/v2/console/rpc/{id}",
+      body: "payload",
+      additional_bindings {
+        get: "/v2/console/rpc/{id}"
+      }
     };
-  }
-
-  rpc GetTournament (TournamentId) returns (nakama.api.Tournament) {
-    option (google.api.http).get = "/v2/console/tournament/{id}";
-  }
-
-  rpc QueryTournaments (nakama.api.ListTournamentsRequest) returns (nakama.api.TournamentList) {
-    option (google.api.http) = {
-      get: "/v2/console/tournament"
-    };
-  }
-
-  rpc UpdateTournament (nakama.api.Tournament) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      put: "/v2/console/tournament/{id}",
-      body: "*"
-    };
-  }
-
-  rpc DeleteTournament (TournamentId) returns (google.protobuf.Empty) {
-    option (google.api.http).delete = "/v2/console/tournament/{id}";
   }
 }
 
@@ -511,49 +494,4 @@ message WriteStorageObjectRequest {
   google.protobuf.Int32Value permission_read = 6;
   // Write permission value.
   google.protobuf.Int32Value permission_write = 7;
-}
-
-message TournamentId {
-  string id = 1;
-}
-
-message CreateTournamentRequest {
-  // Tournament title
-  string title = 1;
-
-  // Tournament description
-  string description = 2;
-
-  // 1 - 127
-  uint32 category = 3;
-
-  // Duration in seconds
-  uint32 duration = 4;
-
-  // Start time in seconds from now
-  uint32 startTime = 5;
-
-  // End time in seconds from now (or 0 for never ending)
-  uint32 endTime = 6;
-
-  // CRON string like "0 12 * * *" (noon UTC each day)
-  string reset = 7;
-
-  // Sorting direction ("asc" or "desc")
-  string sortOrder = 8;
-
-  // Update operation ("best", "set" or "incr")
-  string operator = 9;
-
-  // Maximum allowed players
-  uint32 maxSize = 10;
-
-  // Maximum scores that a player can submit
-  uint32 maxNumScores = 11;
-
-  // Wether a player must first join to submit a score
-  bool joinRequired = 12;
-
-  // The tournament's custom metadata encoded as JSON
-  string metadataJson = 30;
 }
