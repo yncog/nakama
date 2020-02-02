@@ -234,24 +234,24 @@ service Console {
     };
   }
 
-  rpc CreateTournament (CreateTournamentRequest) returns (CreateTournamentResponse) {
+  rpc CreateTournament (CreateTournamentRequest) returns (TournamentId) {
     option (google.api.http) = {
       post: "/v2/console/tournament",
       body: "*"
     };
   }
 
-  rpc GetTournament (TournamentId) returns (CreateTournamentResponse) {
+  rpc GetTournament (TournamentId) returns (nakama.api.Tournament) {
     option (google.api.http).get = "/v2/console/tournament/{id}";
   }
 
-  rpc ListTournaments (TournamentsRequest) returns (TournamentsList) {
+  rpc QueryTournaments (nakama.api.ListTournamentsRequest) returns (nakama.api.TournamentList) {
     option (google.api.http) = {
       get: "/v2/console/tournament"
     };
   }
 
-  rpc UpdateTournament (UpdateTournamentRequest) returns (google.protobuf.Empty) {
+  rpc UpdateTournament (nakama.api.Tournament) returns (google.protobuf.Empty) {
     option (google.api.http) = {
       put: "/v2/console/tournament/{id}",
       body: "*"
@@ -513,14 +513,11 @@ message WriteStorageObjectRequest {
   google.protobuf.Int32Value permission_write = 7;
 }
 
-message Tournament {
-  // Update operation types
-  enum OperatorType {
-    BEST = 1;
-    SET = 2;
-    INCR = 3;
-  }
+message TournamentId {
+  string id = 1;
+}
 
+message CreateTournamentRequest {
   // Tournament title
   string title = 1;
 
@@ -542,11 +539,11 @@ message Tournament {
   // CRON string like "0 12 * * *" (noon UTC each day)
   string reset = 7;
 
-  // Whether to reverse the sorting direction
-  bool sortDescending = 8;
+  // Sorting direction ("asc" or "desc")
+  string sortOrder = 8;
 
-  // Update operation
-  OperatorType operator = 9;
+  // Update operation ("best", "set" or "incr")
+  string operator = 9;
 
   // Maximum allowed players
   uint32 maxSize = 10;
@@ -559,34 +556,4 @@ message Tournament {
 
   // The tournament's custom metadata encoded as JSON
   string metadataJson = 30;
-}
-
-message TournamentId {
-  string id = 1;
-}
-
-message CreateTournamentRequest {
-  Tournament tournament = 1;
-}
-
-message CreateTournamentResponse {
-  TournamentId id = 1;
-}
-
-message TournamentsRequest {
-  uint64 fromTimestamp = 1;
-  uint64 toTimestamp = 2;
-  string titleQuery = 3;
-  
-  uint32 pageSize = 10;
-  uint32 pageOffset = 11;
-}
-
-message TournamentsList {
-  repeated Tournament tournaments = 1;
-}
-
-message UpdateTournamentRequest {
-  string id = 1;
-  Tournament tournament = 2;
 }
