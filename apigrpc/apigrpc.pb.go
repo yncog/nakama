@@ -164,11 +164,11 @@ var fileDescriptor_84e2d31978c605c7 = []byte{
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ context.Context
-var _ grpc.ClientConn
+var _ grpc.ClientConnInterface
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion4
+const _ = grpc.SupportPackageIsVersion6
 
 // NakamaClient is the client API for Nakama service.
 //
@@ -299,10 +299,10 @@ type NakamaClient interface {
 }
 
 type nakamaClient struct {
-	cc *grpc.ClientConn
+	cc grpc.ClientConnInterface
 }
 
-func NewNakamaClient(cc *grpc.ClientConn) NakamaClient {
+func NewNakamaClient(cc grpc.ClientConnInterface) NakamaClient {
 	return &nakamaClient{cc}
 }
 
