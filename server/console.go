@@ -139,6 +139,13 @@ func StartConsoleServer(logger *zap.Logger, startupLogger *zap.Logger, db *sql.D
 				}
 				return
 			}
+
+			// Special handling for generic rpc
+			if strings.HasPrefix(r.URL.Path, consoleRpcRoutePrefix) {
+				s.httpRpcHandler(w, r)
+				return
+			}
+
 			grpcGateway.ServeHTTP(w, r)
 		}
 	})

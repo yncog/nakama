@@ -85,7 +85,7 @@ func (s *ApiServer) RpcFuncHttp(w http.ResponseWriter, r *http.Request) {
 
 	// Check the RPC function ID.
 	maybeID, ok := mux.Vars(r)["id"]
-	if !ok || maybeID == "" {
+	if !ok || maybeID == "" || strings.HasPrefix(maybeID, consoleRpcPrefix) {
 		// Missing RPC function ID.
 		w.WriteHeader(http.StatusBadRequest)
 		w.Header().Set("content-type", "application/json")
@@ -95,6 +95,7 @@ func (s *ApiServer) RpcFuncHttp(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
 	id := strings.ToLower(maybeID)
 
 	// Find the correct RPC function.

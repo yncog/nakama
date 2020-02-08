@@ -233,17 +233,6 @@ service Console {
       body: "*"
     };
   }
-
-  // Execute a Lua function on the server.
-  rpc RpcFunc (api.Rpc) returns (api.Rpc) {
-    option (google.api.http) = {
-      post: "/v2/console/rpc/{id}",
-      body: "payload",
-      additional_bindings {
-        get: "/v2/console/rpc/{id}"
-      }
-    };
-  }
 }
 
 // Account information.
