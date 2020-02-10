@@ -49,7 +49,7 @@ import (
 	"github.com/heroiclabs/nakama-common/rtapi"
 	"github.com/heroiclabs/nakama/v2/cronexpr"
 	"github.com/heroiclabs/nakama/v2/social"
-	"github.com/yuin/gopher-lua"
+	lua "github.com/yuin/gopher-lua"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -4699,11 +4699,11 @@ func (n *RuntimeLuaNakamaModule) tournamentList(l *lua.LState) int {
 		return 0
 	}
 	categoryEnd := l.OptInt(2, 0)
-	if categoryEnd < 0 || categoryEnd >= 128 {
-		l.ArgError(2, "categoryEnd must be 0-127")
+	if categoryEnd >= 128 {
+		l.ArgError(2, "categoryEnd must be less than 128")
 		return 0
 	}
-	if categoryStart > categoryEnd {
+	if categoryEnd >= 0 && categoryStart > categoryEnd {
 		l.ArgError(2, "categoryEnd must be >= categoryStart")
 		return 0
 	}
@@ -4712,12 +4712,9 @@ func (n *RuntimeLuaNakamaModule) tournamentList(l *lua.LState) int {
 		l.ArgError(3, "startTime must be >= 0")
 		return 0
 	}
+
 	endTime := l.OptInt(4, 0)
-	if endTime < 0 {
-		l.ArgError(4, "endTime must be >= 0")
-		return 0
-	}
-	if startTime > endTime {
+	if endTime >= 0 && startTime > endTime {
 		l.ArgError(4, "endTime must be >= startTime")
 		return 0
 	}
