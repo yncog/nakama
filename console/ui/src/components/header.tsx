@@ -23,12 +23,6 @@ class Header extends Component {
           </Navbar.Brand>
           <Navbar.Menu>
             <Navbar.Segment align="end">
-              <Navbar.Item target="_blank" href="https://heroiclabs.com">
-                Heroic Labs
-              </Navbar.Item>
-              <Navbar.Item target="_blank" href="https://cloud.heroiclabs.com">
-                Managed Cloud
-              </Navbar.Item>
               <Navbar.Item onClick={this.logout}>
                 <Icon>
                   <FontAwesomeIcon icon="sign-out-alt"/>

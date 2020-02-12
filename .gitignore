@@ -6,7 +6,7 @@ nakama
 
 # *.pb.go
 !dashboard/build
-data/*
+#data/*
 .GITHUB_TOKEN
 .idea
 *.iml

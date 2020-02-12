@@ -21,6 +21,11 @@ import {statusSaga} from './status/sagas';
 import {statusReducer} from './status/reducer';
 import {StatusState} from './status/types';
 
+
+import {tournamentSaga} from './tournaments/sagas';
+import {tournamentReducer, tournamentsReducer} from './tournaments/reducer';
+import {TournamentState, TournamentsState} from './tournaments/types';
+
 export interface ConnectedReduxProps<A extends Action = AnyAction>
 {
   dispatch: Dispatch<A>
@@ -34,6 +39,8 @@ export interface ApplicationState
   storage_details: StorageState,
   user: UsersState,
   user_details: UserState,
+  tournament: TournamentsState,
+  tournament_details: TournamentState,
   status: StatusState
 };
 
@@ -45,7 +52,9 @@ export const createRootReducer = () =>
     storage_details: storageReducer,
     user: usersReducer,
     user_details: userReducer,
-    status: statusReducer
+    status: statusReducer,
+    tournament: tournamentsReducer,
+    tournament_details: tournamentReducer
   });
 
 export function* rootSaga()
@@ -55,6 +64,7 @@ export function* rootSaga()
     fork(configurationSaga),
     fork(storageSaga),
     fork(userSaga),
-    fork(statusSaga)
+    fork(statusSaga),
+    fork(tournamentSaga)
   ]);
 };

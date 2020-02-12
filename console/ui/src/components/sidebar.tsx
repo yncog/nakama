@@ -45,22 +45,13 @@ class Sidebar extends Component<Props, State>
               className={cn({'is-active': this.props.active === 'storage'})}
             >Storage</Link>
           </Menu.List.Item>
-        </Menu.List>
-
-        <Menu.Label>Resources</Menu.Label>
-        <Menu.List>
-          <Menu.List.Item
-            target="_blank"
-            href="https://heroiclabs.com/docs"
-          >Documentation</Menu.List.Item>
-          <Menu.List.Item
-            target="_blank"
-            href="mailto:sales@heroiclabs.com"
-          >Support</Menu.List.Item>
-          <Menu.List.Item
-            target="_blank"
-            href="https://forum.heroiclabs.com"
-          >Community</Menu.List.Item>
+          <Menu.List.Item as="span">
+            <Link
+              to="/tournaments"
+              className={cn({'is-active': this.props.active === 'tournaments'})}
+            >Tournaments</Link>
+            
+          </Menu.List.Item>
         </Menu.List>
       </Menu>
     </Column>;

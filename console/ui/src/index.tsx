@@ -31,6 +31,8 @@ import Users from './routes/users';
 import UsersDetails from './routes/users/details';
 import Storage from './routes/storage';
 import StorageDetails from './routes/storage/details';
+import Tournaments from './routes/tournaments';
+import TournamentsDetails from './routes/tournaments/details';
 
 import 'rbx/index.css';
 import './css/index.css';
@@ -81,6 +83,8 @@ ReactDOM.render(
         <Route path="/storage" component={Storage}/>
         <Route path="/users/:id" component={UsersDetails}/>
         <Route path="/users" component={Users}/>
+        <Route path="/tournaments/:id" component={TournamentsDetails}/>
+        <Route path="/tournaments" component={Tournaments}/>
         <Route path="/configuration" component={Configuration}/>
         <Route path="/status" component={Status}/>
         <Route path="/login" component={Login}/>

@@ -47,17 +47,12 @@ export interface UserGroupListUserGroup {
   // The user's relationship to the group.
   state?: number;
 }
-/** Unlink a particular device ID from a user's account. */
-export interface UnlinkDeviceRequest {
-  // User ID to unlink from.
-  id?: string;
-  // Device ID to unlink.
-  device_id?: string;
-}
 /** Send a device to the server. Used with authenticate/link/unlink and user. */
 export interface ApiAccountDevice {
   // A device identifier. Should be obtained by a platform-specific device API.
   id?: string;
+  // Extra information that will be bundled in the session token.
+  vars?: Map<string, string>;
 }
 /** A message sent on a channel. */
 export interface ApiChannelMessage {
@@ -69,14 +64,22 @@ export interface ApiChannelMessage {
   content?: string;
   // The UNIX time when the message was created.
   create_time?: string;
+  // The ID of the group, or an empty string if this message was not sent through a group channel.
+  group_id?: string;
   // The unique ID of this message.
   message_id?: string;
   // True if the message was persisted to the channel's history, false otherwise.
   persistent?: boolean;
+  // The name of the chat room, or an empty string if this message was not sent through a chat room.
+  room_name?: string;
   // Message sender, usually a user ID.
   sender_id?: string;
   // The UNIX time when the message was last updated.
   update_time?: string;
+  // The ID of the first DM user, or an empty string if this message was not sent through a DM chat.
+  user_id_one?: string;
+  // The ID of the second DM user, or an empty string if this message was not sent through a DM chat.
+  user_id_two?: string;
   // The username of the message sender, if any.
   username?: string;
 }
@@ -88,7 +91,9 @@ export interface ApiFriend {
   user?: ApiUser;
 }
 /** A collection of zero or more friends of the user. */
-export interface ApiFriends {
+export interface ApiFriendList {
+  // Cursor for the next page of results, if any.
+  cursor?: string;
   // The Friend objects.
   friends?: Array<ApiFriend>;
 }
@@ -232,6 +237,8 @@ export interface ApiUser {
 }
 /** A list of groups belonging to a user, along with the user's role in each group. */
 export interface ApiUserGroupList {
+  // Cursor for the next page of results, if any.
+  cursor?: string;
   // Group-role pairs for a user.
   user_groups?: Array<UserGroupListUserGroup>;
 }
@@ -265,7 +272,7 @@ export interface ConsoleAuthenticateRequest {
 export interface ConsoleConfig {
   // JSON-encoded active server configuration.
   config?: string;
-  //
+  // 
   server_version?: string;
   // Any warnings about the current config.
   warnings?: Array<ConfigWarning>;
@@ -286,6 +293,13 @@ export interface ConsoleStorageList {
   objects?: Array<ApiStorageObject>;
   // Approximate total number of storage objects.
   total_count?: number;
+}
+/** Unlink a particular device ID from a user's account. */
+export interface ConsoleUnlinkDeviceRequest {
+  // Device ID to unlink.
+  device_id?: string;
+  // User ID to unlink from.
+  id?: string;
 }
 /** A list of users. */
 export interface ConsoleUserList {
@@ -366,7 +380,6 @@ export interface NakamaconsoleUpdateAccountRequest {
   // Email.
   email?: string;
   // User ID to update.
-  password?: string;
   id?: string;
   // Langtag.
   lang_tag?: string;
@@ -374,6 +387,8 @@ export interface NakamaconsoleUpdateAccountRequest {
   location?: string;
   // Metadata.
   metadata?: string;
+  // Password.
+  password?: string;
   // Timezone.
   timezone?: string;
   // Username.
@@ -522,7 +537,7 @@ export const NakamaApi = (configuration: ConfigurationParameters = {
       return napi.doFetch(urlPath, "GET", queryParams, _body, options)
     },
     /** Get a user's list of friend relationships. */
-    getFriends(id: string, options: any = {}): Promise<ApiFriends> {
+    getFriends(id: string, options: any = {}): Promise<ApiFriendList> {
       if (id === null || id === undefined) {
         throw new Error("'id' is a required parameter but is null or undefined.");
       }
@@ -620,7 +635,7 @@ export const NakamaApi = (configuration: ConfigurationParameters = {
       return napi.doFetch(urlPath, "POST", queryParams, _body, options)
     },
     /** Unlink the device ID from a user account. */
-    unlinkDevice(id: string, body: UnlinkDeviceRequest, options: any = {}): Promise<any> {
+    unlinkDevice(id: string, body: ConsoleUnlinkDeviceRequest, options: any = {}): Promise<any> {
       if (id === null || id === undefined) {
         throw new Error("'id' is a required parameter but is null or undefined.");
       }
