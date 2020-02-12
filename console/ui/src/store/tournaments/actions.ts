@@ -39,19 +39,6 @@ export const tournamentFetchError = (message: string) => action(
   TournamentActionTypes.FETCH_ERROR,
   message
 );
-
-export const storageUpdateRequest = (data: TournamentObject) => action(
-  TournamentActionTypes.UPDATE_REQUEST,
-  data
-);
-export const storageUpdateSuccess = () => action(
-  TournamentActionTypes.UPDATE_SUCCESS
-);
-export const storageUpdateError = (message: string) => action(
-  TournamentActionTypes.UPDATE_ERROR,
-  message
-);
-
 export const tournamentDeleteRequest = (data: TournamentObjectRequest) => action(
   TournamentActionTypes.DELETE_REQUEST,
   data,

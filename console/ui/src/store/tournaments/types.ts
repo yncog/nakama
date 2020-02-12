@@ -40,24 +40,24 @@ export interface TournamentsObjectRequest
 
 export enum TournamentActionTypes
 {
-  FETCH_MANY_REQUEST = '@@storage/FETCH_MANY_REQUEST',
-  FETCH_MANY_SUCCESS = '@@storage/FETCH_MANY_SUCCESS',
-  FETCH_MANY_ERROR = '@@storage/FETCH_MANY_ERROR',
-  DELETE_MANY_REQUEST = '@@storage/DELETE_MANY_REQUEST',
-  DELETE_MANY_SUCCESS = '@@storage/DELETE_MANY_SUCCESS',
-  DELETE_MANY_ERROR = '@@storage/DELETE_MANY_ERROR',
-  CREATE_REQUEST = '@@storage/CREATE_REQUEST',
-  CREATE_SUCCESS = '@@storage/CREATE_SUCCESS',
-  CREATE_ERROR = '@@storage/CREATE_ERROR',
-  FETCH_REQUEST = '@@storage/FETCH_REQUEST',
-  FETCH_SUCCESS = '@@storage/FETCH_SUCCESS',
-  FETCH_ERROR = '@@storage/FETCH_ERROR',
-  UPDATE_REQUEST = '@@storage/UPDATE_REQUEST',
-  UPDATE_SUCCESS = '@@storage/UPDATE_SUCCESS',
-  UPDATE_ERROR = '@@storage/UPDATE_ERROR',
-  DELETE_REQUEST = '@@storage/DELETE_REQUEST',
-  DELETE_SUCCESS = '@@storage/DELETE_SUCCESS',
-  DELETE_ERROR = '@@storage/DELETE_ERROR'
+  FETCH_MANY_REQUEST = '@@tournaments/FETCH_MANY_REQUEST',
+  FETCH_MANY_SUCCESS = '@@tournaments/FETCH_MANY_SUCCESS',
+  FETCH_MANY_ERROR = '@@tournaments/FETCH_MANY_ERROR',
+  DELETE_MANY_REQUEST = '@@tournaments/DELETE_MANY_REQUEST',
+  DELETE_MANY_SUCCESS = '@@tournaments/DELETE_MANY_SUCCESS',
+  DELETE_MANY_ERROR = '@@tournaments/DELETE_MANY_ERROR',
+  CREATE_REQUEST = '@@tournaments/CREATE_REQUEST',
+  CREATE_SUCCESS = '@@tournaments/CREATE_SUCCESS',
+  CREATE_ERROR = '@@tournaments/CREATE_ERROR',
+  FETCH_REQUEST = '@@tournaments/FETCH_REQUEST',
+  FETCH_SUCCESS = '@@tournaments/FETCH_SUCCESS',
+  FETCH_ERROR = '@@tournaments/FETCH_ERROR',
+  UPDATE_REQUEST = '@@tournaments/UPDATE_REQUEST',
+  UPDATE_SUCCESS = '@@tournaments/UPDATE_SUCCESS',
+  UPDATE_ERROR = '@@tournaments/UPDATE_ERROR',
+  DELETE_REQUEST = '@@tournaments/DELETE_REQUEST',
+  DELETE_SUCCESS = '@@tournaments/DELETE_SUCCESS',
+  DELETE_ERROR = '@@tournaments/DELETE_ERROR'
 };
 
 export interface TournamentsState
