@@ -63,7 +63,11 @@ local function list(context, payload)
         request.endTime or -1,
         request.limit or 20)
 
-    return nk.json_encode(tournaments)
+    local result = {
+        tournaments = tournaments,
+        total_count = #tournaments
+    }
+    return nk.json_encode(result)
 end
 
 nk.register_rpc(list, "console.list_tournaments")

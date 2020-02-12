@@ -98,7 +98,7 @@ class Tournaments extends Component<Props, State> {
               </Table.Head>
               <Table.Body>
                 {
-                  (data.objects || []).map((tournament, key) =>
+                  (data.tournaments || []).map((tournament, key) =>
                     <Table.Row
                       key={`cell_${key}`}
                       onClick={this.details.bind(this, tournament.id)}

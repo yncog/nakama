@@ -29,7 +29,7 @@ export interface TournamentObject
 
 export interface TournamentsObject
 {
-  objects: TournamentObject[],
+  tournaments: TournamentObject[],
   total_count: number
 };
 

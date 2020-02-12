@@ -4,7 +4,7 @@ import {TournamentState, TournamentsState, TournamentActionTypes} from './types'
 const initialTournamentsState: TournamentsState = {
   data:
   {
-    objects: [],
+    tournaments: [],
     total_count: 0
   },
   errors: undefined,
