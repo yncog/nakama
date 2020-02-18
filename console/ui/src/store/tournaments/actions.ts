@@ -1,7 +1,7 @@
 import {action} from 'typesafe-actions';
-import {TournamentActionTypes, TournamentObjectRequest, TournamentObject, TournamentsObject} from './types';
+import {TournamentActionTypes, TournamentObjectRequest, TournamentsObjectRequest, TournamentObject, TournamentsObject} from './types';
 
-export const tournamentFetchManyRequest = (data: TournamentObjectRequest) => action(
+export const tournamentFetchManyRequest = (data: TournamentsObjectRequest) => action(
   TournamentActionTypes.FETCH_MANY_REQUEST,
   data
 );

@@ -74,8 +74,17 @@ nk.register_rpc(list, "console.list_tournaments")
 
 local function get(context, payload)
     local request = http_request(context, payload)
+    local ids = {request.id}
+    local tournaments = nk.tournament_get(ids)
 
-    return nk.tout
+    local result = nil
+    if tournaments and #tournaments > 0 then
+        result = tournaments[1]
+    else
+        result = {error="Not Found", error_code=404}
+    end
+
+    return nk.json_encode(result)
 end
 
 nk.register_rpc(get, "console.get_tournament")

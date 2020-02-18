@@ -32,27 +32,26 @@ export const tournamentsReducer: Reducer<TournamentsState> = (state = initialTou
   }
 }
 
-const now = new Date();
 const initialTournamentState: TournamentState = {
   data:
   {
     id: '',
-    sort: '',
+    sort_order: '',
     operator: '',
     title: '',
     description: '',
     category: 0,
     size: 0,
-    maxSize: 0,
-    maxNumScore: 0,
-    canEnter: true,
+    max_size: 0,
+    max_num_score: 0,
+    can_enter: true,
     duration: 0,
-    createTime: now,
-    startTime: now,
-    endTime: now,
-    startActive: now,
-    endActive: now,
-    nextReset: now,
+    create_time: 0,
+    start_time: 0,
+    end_time: 0,
+    start_active: 0,
+    end_active: 0,
+    next_reset: 0,
     metadata: {}
   },
   updated: false,

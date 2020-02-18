@@ -2,7 +2,7 @@ import {JSONObject} from "../common";
 
 export interface TournamentObjectRequest
 {
-
+  id: string
 }
 
 export interface TournamentObject
@@ -11,19 +11,19 @@ export interface TournamentObject
   title: string,
   description?: string,
   category: number,
-  sort: string,
+  sort_order: string,
   size: number,
   operator: string,
-  maxSize: number,
-  maxNumScore: number,
-  canEnter: boolean,
+  max_size: number,
+  max_num_score: number,
+  can_enter: boolean,
   duration: number,
-  createTime: Date,
-  startTime: Date,
-  endTime:Date,
-  startActive: Date
-  endActive: Date,
-  nextReset: Date,
+  create_time: number,
+  start_time: number,
+  end_time:number,
+  start_active: number
+  end_active: number,
+  next_reset: number,
   metadata: JSONObject,
 };
 

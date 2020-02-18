@@ -204,6 +204,7 @@ func (n *RuntimeLuaNakamaModule) Loader(l *lua.LState) int {
 		"tournament_add_attempt":      n.tournamentAddAttempt,
 		"tournament_join":             n.tournamentJoin,
 		"tournament_list":             n.tournamentList,
+		"tournament_get":              n.tournamentsGetId,
 		"tournament_record_write":     n.tournamentRecordWrite,
 		"tournament_records_haystack": n.tournamentRecordsHaystack,
 		"groups_get_id":               n.groupsGetId,
