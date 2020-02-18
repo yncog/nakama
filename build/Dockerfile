@@ -15,7 +15,7 @@
 # docker build "$PWD" --build-arg commit="$(git rev-parse --short HEAD)" --build-arg version=v2.1.1 -t heroiclabs/nakama:2.1.1
 # docker build "$PWD" --build-arg commit="$(git rev-parse --short HEAD)" --build-arg version="v2.1.1-$(git rev-parse --short HEAD)" -t heroiclabs/nakama-prerelease:"2.1.1-$(git rev-parse --short HEAD)"
 
-FROM golang:1.13.6-buster as builder
+FROM golang:1.13.8-buster as builder
 
 ARG commit
 ARG version
@@ -47,7 +47,7 @@ LABEL description="Distributed server for social and realtime games and apps."
 RUN mkdir -p /nakama/data/modules && \
     apt-get update && \
     apt-get -y upgrade && \
-    apt-get install -y --no-install-recommends ca-certificates tzdata curl iproute2 unzip rsync git tini && \
+    apt-get install -y --no-install-recommends ca-certificates tzdata curl iproute2 unzip rsync git tini schroot && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

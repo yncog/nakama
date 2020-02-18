@@ -5,15 +5,27 @@ The format is based on [keep a changelog](http://keepachangelog.com) and this pr
 
 ## [Unreleased]
 ### Added
+- Return tournament end time in listing operations if one exists.
+
+### Changed
+- Build with Go 1.13.8 release.
+
+## [2.10.0] - 2020-02-13
+### Added
 - New metric for number of authoritative matches currently running.
 - New metric for total number of events dropped by the events processor pool.
 
 ### Changed
+- Build with Go 1.13.7 release.
 - Update username on leaderboard and tournament records when processing a score update.
 - Automatically stop empty authoritative matches after a configurable amount of time.
 
 ### Fixed
-- Correctly calculate 'can enter' field for newly created tournaments.
+- Fix calculation for 'can enter' field for newly created tournaments.
+- Ensure tournament reset callbacks carry the correct ID.
+- Ensure tournament end callbacks carry the correct end and reset times.
+- Expose match stopped state to the Lua runtime match dispatcher.
+- Fix calculation of tournament start active time for schedules with variable active durations.
 
 ## [2.9.1] - 2020-01-14
 ### Changed

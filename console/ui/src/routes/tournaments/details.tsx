@@ -328,117 +328,152 @@ class TournamentDetails extends Component<Props, State> {
               <Column.Group>
                 <Column size={8}>
                   <Box>
-                  <Field horizontal>
-                    <Field.Label size="normal" textAlign="left">
-                      <Label>{data.can_enter ? 'Active': 'Inactive'}</Label>
-                    </Field.Label>
-                    <Field.Body>
-                      <Field>
-                        <Control>
-                          <Input
-                            static
-                            key={this.key('can_enter')}
-                            type="text"
-                            name="can_enter"
-                            defaultValue={(data.can_enter ? 'Until ' : 'Since ') + this.formatDate(data.end_active)}
-                          />
-                        </Control>
-                      </Field>
-                    </Field.Body>
-                  </Field>
-                  <Field horizontal>
-                    <Field.Label size="normal" textAlign="left">
-                      <Label>Duration</Label>
-                    </Field.Label>
-                    <Field.Body>
-                      <Field>
-                        <Control>
-                          <Input
-                            static
-                            key={this.key('duration')}
-                            type="text"
-                            name="duration"
-                            defaultValue={this.formatDuration(data.duration)}
-                          />
-                        </Control>
-                      </Field>
-                    </Field.Body>
-                  </Field>
-                  
-                  <Field horizontal>
-                    <Field.Label size="normal" textAlign="left">
-                      <Label>Create Time</Label>
-                    </Field.Label>
-                    <Field.Body>
-                      <Field>
-                        <Control>
-                          <Input
-                            static
-                            key={this.key('create_time')}
-                            type="text"
-                            name="create_time"
-                            defaultValue={this.formatDate(data.create_time)}
-                          />
-                        </Control>
-                      </Field>
-                    </Field.Body>
-                  </Field>
+                    <Field horizontal>
+                      <Field.Label size="normal" textAlign="left">
+                        <Label>Create Time</Label>
+                      </Field.Label>
+                      <Field.Body>
+                        <Field>
+                          <Control>
+                            <Input
+                              static
+                              key={this.key('create_time')}
+                              type="text"
+                              name="create_time"
+                              defaultValue={this.formatDate(data.create_time)}
+                            />
+                          </Control>
+                        </Field>
+                      </Field.Body>
+                    </Field>
 
-                  <Field horizontal>
-                    <Field.Label size="normal" textAlign="left">
-                      <Label>Start Time</Label>
-                    </Field.Label>
-                    <Field.Body>
-                      <Field>
-                        <Control>
-                          <Input
-                            static
-                            key={this.key('start_time')}
-                            type="text"
-                            name="start_time"
-                            defaultValue={this.formatDate(data.start_time)}
-                          />
-                        </Control>
-                      </Field>
-                    </Field.Body>
-                  </Field>
+                    <Field horizontal>
+                      <Field.Label size="normal" textAlign="left">
+                        <Label>Start Time</Label>
+                      </Field.Label>
+                      <Field.Body>
+                        <Field>
+                          <Control>
+                            <Input
+                              static
+                              key={this.key('start_time')}
+                              type="text"
+                              name="start_time"
+                              defaultValue={this.formatDate(data.start_time)}
+                            />
+                          </Control>
+                        </Field>
+                      </Field.Body>
+                    </Field>
 
-                  <Field horizontal>
-                    <Field.Label size="normal" textAlign="left">
-                      <Label>End Time</Label>
-                    </Field.Label>
-                    <Field.Body>
-                      <Field>
-                        <Control>
-                          <Input
-                            static
-                            key={this.key('end_time')}
-                            type="text"
-                            name="end_time"
-                            defaultValue={this.formatDate(data.end_time)}
-                          />
-                        </Control>
-                      </Field>
-                    </Field.Body>
-                  </Field>
-                  <Field horizontal>
-                    <Field.Label size="normal" textAlign="left">
-                      <Label>Next Reset</Label>
-                    </Field.Label>
-                    <Field.Body>
-                      <Field>
-                        <Control>
-                          <Input
-                            static
-                            key={this.key('next_reset')}
-                            type="text"
-                            name="next_reset"
-                            defaultValue={this.formatDate(data.next_reset)}
-                          />
-                        </Control>
-                      </Field>
-                    </Field.Body>
-                  </Field>
+                    <Field horizontal>
+                      <Field.Label size="normal" textAlign="left">
+                        <Label>End Time</Label>
+                      </Field.Label>
+                      <Field.Body>
+                        <Field>
+                          <Control>
+                            <Input
+                              static
+                              key={this.key('end_time')}
+                              type="text"
+                              name="end_time"
+                              defaultValue={this.formatDate(data.end_time)}
+                            />
+                          </Control>
+                        </Field>
+                      </Field.Body>
+                    </Field>
+                    <Field horizontal>
+                      <Field.Label size="normal" textAlign="left">
+                        <Label>Duration</Label>
+                      </Field.Label>
+                      <Field.Body>
+                        <Field>
+                          <Control>
+                            <Input
+                              static
+                              key={this.key('duration')}
+                              type="text"
+                              name="duration"
+                              defaultValue={this.formatDuration(data.duration)}
+                            />
+                          </Control>
+                        </Field>
+                      </Field.Body>
+                    </Field>
+                    <Field horizontal>
+                      <Field.Label size="normal" textAlign="left">
+                        <Label>Currently Active</Label>
+                      </Field.Label>
+                      <Field.Body>
+                        <Field>
+                          <Control>
+                            <Input
+                              static
+                              key={this.key('can_enter')}
+                              type="text"
+                              name="can_enter"
+                              defaultValue={(data.can_enter ? 'Yes ' : 'No ')}
+                            />
+                          </Control>
+                        </Field>
+                      </Field.Body>
+                    </Field>
+                    <Field horizontal>
+                      <Field.Label size="normal" textAlign="left">
+                        <Label>Active Start Time</Label>
+                      </Field.Label>
+                      <Field.Body>
+                        <Field>
+                          <Control>
+                            <Input
+                              static
+                              key={this.key('start_active')}
+                              type="text"
+                              name="start_active"
+                              defaultValue={this.formatDate(data.start_active)}
+                            />
+                          </Control>
+                        </Field>
+                      </Field.Body>
+                    </Field>
+                    <Field horizontal>
+                      <Field.Label size="normal" textAlign="left">
+                        <Label>Active End Time</Label>
+                      </Field.Label>
+                      <Field.Body>
+                        <Field>
+                          <Control>
+                            <Input
+                              static
+                              key={this.key('end_active')}
+                              type="text"
+                              name="end_active"
+                              defaultValue={this.formatDate(data.end_active)}
+                            />
+                          </Control>
+                        </Field>
+                      </Field.Body>
+                    </Field>
+                    <Field horizontal>
+                      <Field.Label size="normal" textAlign="left">
+                        <Label>Next Reset</Label>
+                      </Field.Label>
+                      <Field.Body>
+                        <Field>
+                          <Control>
+                            <Input
+                              static
+                              key={this.key('next_reset')}
+                              type="text"
+                              name="next_reset"
+                              defaultValue={this.formatDate(data.next_reset)}
+                            />
+                          </Control>
+                        </Field>
+                      </Field.Body>
+                    </Field>
                   </Box>
                 </Column>
               </Column.Group>

@@ -75,7 +75,7 @@ nk.register_rpc(list, "console.list_tournaments")
 local function get(context, payload)
     local request = http_request(context, payload)
     local ids = {request.id}
-    local tournaments = nk.tournament_get(ids)
+    local tournaments = nk.tournaments_get_id(ids)
 
     local result = nil
     if tournaments and #tournaments > 0 then
