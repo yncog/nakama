@@ -1,5 +1,5 @@
 import {Reducer} from 'redux';
-import {TournamentState, TournamentsState, TournamentActionTypes} from './types';
+import {TournamentState, TournamentsState, TournamentActionTypes, NewTournamentState} from './types';
 
 const initialTournamentsState: TournamentsState = {
   data:
@@ -37,7 +37,6 @@ const initialTournamentState: TournamentState = {
   {
     id: '',
     sort_order: '',
-    operator: '',
     title: '',
     description: '',
     category: 0,
@@ -63,12 +62,6 @@ export const tournamentReducer: Reducer<TournamentState> = (state = initialTourn
 {
   switch(action.type)
   {
-    case TournamentActionTypes.CREATE_REQUEST:
-      return {...state, loading: true};
-    case TournamentActionTypes.CREATE_SUCCESS:
-      return {...state, loading: false, errors: undefined, data: action.payload};
-    case TournamentActionTypes.CREATE_ERROR:
-      return {...state, loading: false, errors: action.payload, data: initialTournamentState.data};
     case TournamentActionTypes.FETCH_REQUEST:
       return {...state, loading: true};
     case TournamentActionTypes.FETCH_SUCCESS:
@@ -86,6 +79,29 @@ export const tournamentReducer: Reducer<TournamentState> = (state = initialTourn
     case TournamentActionTypes.DELETE_SUCCESS:
       return {...state, loading: false, errors: undefined};
     case TournamentActionTypes.DELETE_ERROR:
+      return {...state, loading: false, errors: action.payload};
+    default:
+      return state;
+  }
+}
+
+const initialNewTournamentState: NewTournamentState = {
+  errors: undefined,
+  data: {
+    id: ''
+  },
+  loading: false
+};
+
+export const newTournamentReducer: Reducer<NewTournamentState> = (state = initialNewTournamentState, action) =>
+{
+  switch(action.type)
+  {
+    case TournamentActionTypes.CREATE_REQUEST:
+      return {...state, loading: true};
+    case TournamentActionTypes.CREATE_SUCCESS:
+      return {...state, loading: false, errors: undefined, data: action.payload};
+    case TournamentActionTypes.CREATE_ERROR:
       return {...state, loading: false, errors: action.payload};
     default:
       return state;

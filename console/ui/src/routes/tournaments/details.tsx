@@ -6,7 +6,7 @@ import {Dispatch} from 'redux';
 import {connect} from 'react-redux';
 import {ApplicationState, ConnectedReduxProps} from '../../store';
 import * as tournamentActions from '../../store/tournaments/actions';
-import {TournamentObject, TournamentObjectRequest} from '../../store/tournaments/types';
+import {TournamentObject, TournamentReference} from '../../store/tournaments/types';
 
 import {
   Box,
@@ -23,9 +23,8 @@ import {
   Level,
   Notification,
   Section,
-  Select,
-  Textarea,
-  Title
+  Content,
+  Textarea
 } from 'rbx';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 
@@ -58,7 +57,7 @@ type State = {};
 class TournamentDetails extends Component<Props, State> {
   public componentDidMount() {
     const {match} = this.props;
-    this.props.fetchRequest(match.params as TournamentObjectRequest);
+    this.props.fetchRequest(match.params as TournamentReference);
   }
 
   public key(prefix: string) {
@@ -80,7 +79,7 @@ class TournamentDetails extends Component<Props, State> {
   public remove() {
     const {match, history} = this.props;
     if (confirm('Are you sure you want to delete this tournament?')) {
-      this.props.deleteRequest(match.params as TournamentObjectRequest);
+      this.props.deleteRequest(match.params as TournamentReference);
       history.goBack();
     }
   }
@@ -107,7 +106,7 @@ class TournamentDetails extends Component<Props, State> {
   }
 
   public render() {
-    const {data, updated, errors} = this.props;
+    const {data, errors} = this.props;
     return <Generic id="tournament_details">
       <Header/>
       <Section>
@@ -181,6 +180,7 @@ class TournamentDetails extends Component<Props, State> {
                       <Field>
                         <Control>
                           <Input
+                            static
                             key={this.key('title')}
                             type="text"
                             name="title"
@@ -197,15 +197,9 @@ class TournamentDetails extends Component<Props, State> {
                   <Field>
                     <Label>Description</Label>
                     <Field>
-                      <Control>
-                        <Textarea
-                          key={this.key('description')}
-                          placeholder="Description"
-                          rows={2}
-                          name="description"
-                          defaultValue={data.description}
-                        />
-                      </Control>
+                      <Content>
+                        {data.description}
+                      </Content>
                     </Field>
                   </Field>
                 </Column>
@@ -312,15 +306,9 @@ class TournamentDetails extends Component<Props, State> {
                   <Field>
                     <Label>Metadata</Label>
                     <Field>
-                      <Control>
-                        <Textarea
-                          key={this.key('metadata')}
-                          placeholder="Metadata"
-                          rows={3}
-                          name="metadata"
-                          defaultValue={JSON.stringify(data.metadata)}
-                        />
-                      </Control>
+                        <Content>
+                        {JSON.stringify(data.metadata)}
+                        </Content>
                     </Field>
                   </Field>
                 </Column>
@@ -480,19 +468,10 @@ class TournamentDetails extends Component<Props, State> {
 
               <Field kind="group" align="right">
                 {
-                  updated ?
-                    <Notification color="success">Successfully updated storage record.</Notification> :
-                    null
-                }
-                {
                   errors ?
                     <Notification color="danger">{errors}</Notification> :
                     null
                 }
-                &nbsp;
-                <Control>
-                  <Button color="info">Update</Button>
-                </Control>
               </Field>
             </form>
           </Column>
@@ -537,13 +516,13 @@ const mapStateToProps = ({tournament_details}: ApplicationState) => ({
 });
 
 const mapDispatchToProps = (dispatch: Dispatch) => ({
-  fetchRequest: (data: TournamentObjectRequest) => dispatch(
+  fetchRequest: (data: TournamentReference) => dispatch(
     tournamentActions.tournamentFetchRequest(data)
   ),
   /*updateRequest: (data: TournamentObject) => dispatch(
     tournamentActions.storageUpdateRequest(data)
   ),*/
-  deleteRequest: (data: TournamentObjectRequest) => dispatch(
+  deleteRequest: (data: TournamentReference) => dispatch(
     tournamentActions.tournamentDeleteRequest(data)
   )
 });

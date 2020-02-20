@@ -6,7 +6,7 @@ import {Dispatch} from 'redux';
 import {connect} from 'react-redux';
 import {ApplicationState, ConnectedReduxProps} from '../../store';
 import * as tournamentActions from '../../store/tournaments/actions';
-import {TournamentObject, TournamentObjectRequest, TournamentsObject, TournamentsObjectRequest} from '../../store/tournaments/types';
+import {TournamentObject, TournamentReference, TournamentsObject, TournamentsObjectRequest} from '../../store/tournaments/types';
 
 import {Button, Column, Control, Field, Generic, Icon, Input, Level, Section, Table, Title} from 'rbx';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
@@ -49,6 +49,11 @@ class Tournaments extends Component<Props, State> {
     history.push(`/tournaments/${id}`);
   }
 
+  public create() {
+    const {history} = this.props;
+    history.push(`/tournaments/new`);
+  }
+
   public remove(object: TournamentObject, event: React.FormEvent<Element>) {
     event.stopPropagation();
     event.preventDefault();
@@ -73,14 +78,12 @@ class Tournaments extends Component<Props, State> {
                     ~<strong>{data.total_count}</strong> tournaments
                   </Title>
                 </Level.Item>
-
+              </Level.Item>
+              <Level.Item align="right">
                 <Level.Item>
                   <Field kind="addons">
                     <Control>
-                      <Input id="filter" type="text" placeholder="Find a tournament"/>
-                    </Control>
-                    <Control>
-                      <Button onClick={this.all.bind(this)}>Lookup</Button>
+                      <Button onClick={this.create.bind(this)}>New Tournament</Button>
                     </Control>
                   </Field>
                 </Level.Item>
@@ -136,7 +139,7 @@ const mapDispatchToProps = (dispatch: Dispatch) => ({
   fetchManyRequest: (data: TournamentsObjectRequest) => dispatch(
     tournamentActions.tournamentFetchManyRequest(data)
   ),
-  deleteRequest: (data: TournamentObjectRequest) => dispatch(
+  deleteRequest: (data: TournamentReference) => dispatch(
     tournamentActions.tournamentDeleteRequest(data)
   )
 });

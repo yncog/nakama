@@ -1,6 +1,23 @@
 import {JSONObject} from "../common";
 
-export interface TournamentObjectRequest
+export interface NewTournamentRequest
+{
+  title: string,
+  description?: string,
+  category: number,
+  sort_order: string,
+  operator: string,
+  max_size: number,
+  max_num_scores: number,
+  duration: number,
+  start_time: number,
+  end_time:number,
+  reset: string,
+  metadata: string,
+  join_required: boolean
+}
+
+export interface TournamentReference
 {
   id: string
 }
@@ -13,7 +30,6 @@ export interface TournamentObject
   category: number,
   sort_order: string,
   size: number,
-  operator: string,
   max_size: number,
   max_num_score: number,
   can_enter: boolean,
@@ -24,7 +40,7 @@ export interface TournamentObject
   start_active: number
   end_active: number,
   next_reset: number,
-  metadata: JSONObject,
+  metadata: JSONObject
 };
 
 export interface TournamentsObject
@@ -58,6 +74,13 @@ export enum TournamentActionTypes
   DELETE_REQUEST = '@@tournaments/DELETE_REQUEST',
   DELETE_SUCCESS = '@@tournaments/DELETE_SUCCESS',
   DELETE_ERROR = '@@tournaments/DELETE_ERROR'
+};
+
+export interface NewTournamentState
+{
+  readonly loading: boolean,
+  readonly data: TournamentReference,
+  readonly errors?: string
 };
 
 export interface TournamentsState

@@ -66,6 +66,7 @@ function* handleCreate({payload}: AnyAction)
       'create_tournament',
       payload
     );
+    console.log(res.error);
     if(res.error)
     {
       yield put(tournamentCreateError(res.error));
@@ -86,7 +87,14 @@ function* handleCreate({payload}: AnyAction)
     else if(err.json)
     {
       const json = yield err.json();
-      yield put(tournamentCreateError(json.error || JSON.stringify(json)));
+      let error = json.error;
+      if (error.Object){
+        error = error.Object;
+      }
+      else {
+        error = JSON.stringify(error);
+      }
+      yield put(tournamentCreateError(error));
     }
     else if(err instanceof Error)
     {

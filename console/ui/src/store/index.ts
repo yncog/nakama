@@ -23,8 +23,8 @@ import {StatusState} from './status/types';
 
 
 import {tournamentSaga} from './tournaments/sagas';
-import {tournamentReducer, tournamentsReducer} from './tournaments/reducer';
-import {TournamentState, TournamentsState} from './tournaments/types';
+import {tournamentReducer, tournamentsReducer, newTournamentReducer} from './tournaments/reducer';
+import {TournamentState, TournamentsState, NewTournamentState} from './tournaments/types';
 
 export interface ConnectedReduxProps<A extends Action = AnyAction>
 {
@@ -39,6 +39,7 @@ export interface ApplicationState
   storage_details: StorageState,
   user: UsersState,
   user_details: UserState,
+  new_tournament: NewTournamentState,
   tournament: TournamentsState,
   tournament_details: TournamentState,
   status: StatusState
@@ -53,6 +54,7 @@ export const createRootReducer = () =>
     user: usersReducer,
     user_details: userReducer,
     status: statusReducer,
+    new_tournament: newTournamentReducer,
     tournament: tournamentsReducer,
     tournament_details: tournamentReducer
   });

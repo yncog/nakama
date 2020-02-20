@@ -38,8 +38,8 @@ func (s *ConsoleServer) httpRpcHandler(w http.ResponseWriter, r *http.Request) {
 	// Check the RPC function ID.
 	if maybeID == "" {
 		// Missing RPC function ID.
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Header().Set("content-type", "application/json")
 		_, err := w.Write(rpcIDMustBeSetBytes)
 		if err != nil {
 			s.logger.Debug("Error writing response to client", zap.Error(err))
@@ -53,8 +53,8 @@ func (s *ConsoleServer) httpRpcHandler(w http.ResponseWriter, r *http.Request) {
 	fn := s.runtime.Rpc(id)
 	if fn == nil {
 		// No function registered for this ID.
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-		w.Header().Set("content-type", "application/json")
 		_, err := w.Write(rpcFunctionNotFoundBytes)
 		if err != nil {
 			s.logger.Debug("Error writing response to client", zap.Error(err))
@@ -68,8 +68,8 @@ func (s *ConsoleServer) httpRpcHandler(w http.ResponseWriter, r *http.Request) {
 		b, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			// Error reading request body.
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Header().Set("content-type", "application/json")
 			_, err := w.Write(internalServerErrorBytes)
 			if err != nil {
 				s.logger.Debug("Error writing response to client", zap.Error(err))
@@ -85,8 +85,8 @@ func (s *ConsoleServer) httpRpcHandler(w http.ResponseWriter, r *http.Request) {
 	result, fnErr, code := fn(r.Context(), queryParams, "", "", nil, 0, "", clientIP, clientPort, payload)
 	if fnErr != nil {
 		response, _ := json.Marshal(map[string]interface{}{"error": fnErr, "message": fnErr.Error(), "code": code})
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(runtime.HTTPStatusFromCode(code))
-		w.Header().Set("content-type", "application/json")
 		_, err := w.Write(response)
 		if err != nil {
 			s.logger.Debug("Error writing response to client", zap.Error(err))
@@ -98,7 +98,7 @@ func (s *ConsoleServer) httpRpcHandler(w http.ResponseWriter, r *http.Request) {
 	response := []byte(result)
 	//if contentType := r.Header["Content-Type"]; len(contentType) > 0 {
 	// Assume the request input content type is the same as the expected response.
-	//	w.Header().Set("content-type", contentType[0])
+	//	w.Header().Set("Content-Type", contentType[0])
 	//} else {
 	// Fall back to default response content type application/json.
 	w.Header().Set("Content-Type", "application/json")
