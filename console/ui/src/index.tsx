@@ -31,6 +31,7 @@ import Configuration from './routes/configuration';
 import Users from './routes/users';
 import UsersDetails from './routes/users/details';
 import Storage from './routes/storage';
+import NewStorage from './routes/storage/new';
 import StorageDetails from './routes/storage/details';
 import Tournaments from './routes/tournaments';
 import NewTournament from './routes/tournaments/new';
@@ -83,6 +84,7 @@ ReactDOM.render(
     <Router>
       <Switch>
         <Route path="/storage/:collection/:key/:user_id" component={StorageDetails}/>
+        <Route path="/storage/new" component={NewStorage}/>
         <Route path="/storage" component={Storage}/>
         <Route path="/users/:id" component={UsersDetails}/>
         <Route path="/users" component={Users}/>

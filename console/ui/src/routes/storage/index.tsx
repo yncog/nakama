@@ -144,6 +144,11 @@ class Storage extends Component<Props, State>
     }
   }
 
+  public create() {
+    const {history} = this.props;
+    history.push(`/storage/new`);
+  }
+
   public details(object: StorageObject)
   {
     const {history} = this.props;
@@ -223,6 +228,16 @@ class Storage extends Component<Props, State>
               </Level.Item>
 
               <Level.Item align="right">
+                <Level.Item>
+                  <Button
+                    onClick={this.create.bind(this)}
+                  >
+                    <Icon>
+                      <FontAwesomeIcon icon="file" />
+                    </Icon>
+                    <span>Create New</span>
+                  </Button>
+                </Level.Item>
                 <Level.Item>
                   <Dropdown hoverable>
                     <Dropdown.Trigger>

@@ -46,14 +46,12 @@ interface PropsFromDispatch {
 
 type Props = RouteComponentProps & PropsFromState & PropsFromDispatch & ConnectedReduxProps;
 
-type State = {hideCustomReset: boolean};
+type State = {hideCustomReset: boolean, resetValue: string};
 
 class NewTournament extends Component<Props, State> {
-  //
-  refResetSelect = React.createRef<HTMLSelectElement>();
   public constructor(props: Props) {
     super(props);
-    this.state = {hideCustomReset: true};
+    this.state = {hideCustomReset: true, resetValue: ''};
   }
 
   public componentDidMount() {
@@ -65,7 +63,8 @@ class NewTournament extends Component<Props, State> {
   }
 
   private key(prefix: string) {
-    return `${prefix}_new_tournament`;
+    let ts = (new Date()).getTime();
+    return `${prefix}_new_tournament_${ts}`;
   }
 
   private create(event: React.FormEvent<HTMLFormElement>) {
@@ -101,18 +100,15 @@ class NewTournament extends Component<Props, State> {
       return res;
     }, {});
     this.props.createRequest(payload);
-    this.details();
+    if(!this.props.errors){
+      const {history, created} = this.props;
+      history.push(`/tournaments/${created.id}`);
+    }
   }
 
-  private details() {
-    const {history, created} = this.props;
-    history.push(`/tournaments/${created.id}`);
-  }
-
-  private onResetChange() {
-    let select: HTMLSelectElement = this.refResetSelect.current as HTMLSelectElement;
-    let val = select.value;
-    this.setState({hideCustomReset: val !== "custom"});
+  private onResetChange(event:React.ChangeEvent) {
+    let val = (event.target as HTMLSelectElement).value;
+    this.setState({hideCustomReset: val !== "custom", resetValue: val});
   }
 
   public render() {
@@ -336,10 +332,10 @@ class NewTournament extends Component<Props, State> {
                           <Control>
                             <Select.Container>
                               <Select
-                                ref={this.refResetSelect}
                                 onChange={this.onResetChange.bind(this)}
                                 key={this.key('reset')}
                                 name="reset"
+                                value={this.state.resetValue}
                               >
                                 <Select.Option value="0 0 * * *">Daily at midnight</Select.Option>
                                 <Select.Option value="0 0 * * 1">Weekly on Monday</Select.Option>
