@@ -62,6 +62,13 @@ class Tournaments extends Component<Props, State> {
     }
   }
 
+  public clone(id: string, event: React.FormEvent<Element>) {
+    event.stopPropagation();
+    event.preventDefault();
+    const {history} = this.props;
+    history.push(`/tournaments/clone/${id}`);
+  }
+
   public render() {
     const {data} = this.props;
     return <Generic id="tournaments">
@@ -95,8 +102,9 @@ class Tournaments extends Component<Props, State> {
                 <Table.Row>
                   <Table.Heading style={{width: '25%'}}>ID</Table.Heading>
                   <Table.Heading style={{width: '25%'}}>Name</Table.Heading>
-                  <Table.Heading style={{width: '40%'}}>Description</Table.Heading>
-                  <Table.Heading style={{width: '10%'}}>&nbsp;</Table.Heading>
+                  <Table.Heading style={{width: '36%'}}>Description</Table.Heading>
+                  <Table.Heading style={{width: '7%'}}>&nbsp;</Table.Heading>
+                  <Table.Heading style={{width: '7%'}}>&nbsp;</Table.Heading>
                 </Table.Row>
               </Table.Head>
               <Table.Body>
@@ -115,6 +123,14 @@ class Tournaments extends Component<Props, State> {
                               size="small"
                               onClick={this.remove.bind(this, tournament)}
                             >Delete</Button>
+                        }
+                      </Table.Cell>
+                      <Table.Cell>
+                        {
+                            <Button
+                              size="small"
+                              onClick={this.clone.bind(this, tournament.id)}
+                            >Clone</Button>
                         }
                       </Table.Cell>
                     </Table.Row>

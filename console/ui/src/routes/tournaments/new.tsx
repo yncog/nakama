@@ -1,4 +1,4 @@
-import React, {Component} from 'react';
+import React, {Component, RefObject} from 'react';
 import {RouteComponentProps} from 'react-router';
 import {Link} from 'react-router-dom';
 
@@ -6,7 +6,7 @@ import {Dispatch} from 'redux';
 import {connect} from 'react-redux';
 import {ApplicationState, ConnectedReduxProps} from '../../store';
 import * as tournamentActions from '../../store/tournaments/actions';
-import {NewTournamentRequest, TournamentReference} from '../../store/tournaments/types';
+import {NewTournamentRequest, TournamentReference, TournamentObject} from '../../store/tournaments/types';
 
 import {
   Breadcrumb,
@@ -21,9 +21,9 @@ import {
   Notification,
   Section,
   Select,
-  Textarea
+  Textarea,
+  Fieldset
 } from 'rbx';
-import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 
 import Header from '../../components/header';
 import Sidebar from '../../components/sidebar';
@@ -34,28 +34,49 @@ import Sidebar from '../../components/sidebar';
 
 interface PropsFromState {
   loading: boolean,
-  data: TournamentReference,
-  errors: string | undefined
+  errors: string | undefined,
+  data: TournamentObject,
+  created: TournamentReference
 }
 
 interface PropsFromDispatch {
+  fetchRequest: typeof tournamentActions.tournamentFetchRequest,
   createRequest: typeof tournamentActions.tournamentCreateRequest
 }
 
 type Props = RouteComponentProps & PropsFromState & PropsFromDispatch & ConnectedReduxProps;
 
-type State = {};
+type State = {hideCustomReset: boolean};
 
 class NewTournament extends Component<Props, State> {
-  
-  public key(prefix: string) {
+  //
+  refResetSelect = React.createRef<HTMLSelectElement>();
+  public constructor(props: Props) {
+    super(props);
+    this.state = {hideCustomReset: true};
+  }
+
+  public componentDidMount() {
+    const {match} = this.props;
+    const params = match.params as TournamentReference;
+    if(params.id){
+      this.props.fetchRequest(params);
+    }
+  }
+
+  private key(prefix: string) {
     return `${prefix}_new_tournament`;
   }
 
-  public create(event: React.FormEvent<HTMLFormElement>) {
+  private create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.target as HTMLFormElement);
-    const payload = {
+    let reset = data.get('reset') as string;
+    if(reset === 'custom'){
+      reset = data.get('reset_custom') as string;
+    }
+
+    let payload:any = {
       title: data.get('title') as string,
       description: data.get('description') as string,
       category: parseInt(data.get('category') as string),
@@ -66,22 +87,37 @@ class NewTournament extends Component<Props, State> {
       duration: parseInt(data.get('duration') as string),
       start_time: parseInt(data.get('start_time') as string),
       end_time: parseInt(data.get('end_time') as string),
-      reset: (data.get('reset') as string),
-      metadata: (data.get('metadata') as string),
+      reset: reset,
       join_required: (data.get('join_required') as string) == 'true'
     };
+    let metadata = (data.get('metadata') as string);
+    if(metadata && metadata.length > 0) {
+        payload.metadata = JSON.parse(metadata);
+    }
+    payload = Object.keys(payload).reduce((res: any, key: string) => {
+      if(payload[key]){
+        res[key] = payload[key];
+      }
+      return res;
+    }, {});
     this.props.createRequest(payload);
     this.details();
   }
 
-  public details()
-  {
-    const {history, data} = this.props;
-    history.push(`/tournaments/${data.id}`);
+  private details() {
+    const {history, created} = this.props;
+    history.push(`/tournaments/${created.id}`);
+  }
+
+  private onResetChange() {
+    let select: HTMLSelectElement = this.refResetSelect.current as HTMLSelectElement;
+    let val = select.value;
+    this.setState({hideCustomReset: val !== "custom"});
   }
 
   public render() {
-    const {errors, data} = this.props;
+    let {errors, data} = this.props;
+
     return <Generic id="new_tournament">
       <Header/>
       <Section>
@@ -114,6 +150,7 @@ class NewTournament extends Component<Props, State> {
                             key={this.key('title')}
                             type="text"
                             name="title"
+                            defaultValue={data && data.title}
                           />
                         </Control>
                       </Field>
@@ -132,6 +169,7 @@ class NewTournament extends Component<Props, State> {
                           placeholder="Description"
                           rows={2}
                           name="description"
+                          defaultValue={data && data.description}
                         />
                       </Control>
                     </Field>
@@ -153,6 +191,7 @@ class NewTournament extends Component<Props, State> {
                             min="0"
                             max="127"
                             name="category"
+                            defaultValue={data && data.category}
                           />
                         </Control>
                       </Field>
@@ -170,6 +209,7 @@ class NewTournament extends Component<Props, State> {
                             <Select
                               key={this.key('sort_order')}
                               name="sort_order"
+                              defaultValue={data && data.sort_order}
                             >
                               <Select.Option value="desc">Descending</Select.Option>
                               <Select.Option value="asc">Ascending</Select.Option>
@@ -213,6 +253,7 @@ class NewTournament extends Component<Props, State> {
                             key={this.key('max_num_score')}
                             type="number"
                             name="max_num_score"
+                            defaultValue={data && data.max_num_score}
                           />
                         </Control>
                       </Field>
@@ -230,6 +271,7 @@ class NewTournament extends Component<Props, State> {
                             key={this.key('max_size')}
                             type="number"
                             name="max_size"
+                            defaultValue={data && data.max_size}
                           />
                         </Control>
                       </Field>
@@ -246,6 +288,7 @@ class NewTournament extends Component<Props, State> {
                             key={this.key('duration')}
                             type="number"
                             name="duration"
+                            defaultValue={data && data.duration}
                           />
                         </Control>
                       </Field>
@@ -285,18 +328,39 @@ class NewTournament extends Component<Props, State> {
                   </Field>
                   <Field horizontal>
                     <Field.Label size="normal" textAlign="left">
-                      <Label>Reset Schedule (CRON string)</Label>
+                      <Label>Reset Schedule</Label>
                     </Field.Label>
                     <Field.Body>
-                      <Field>
-                        <Control>
-                          <Input
-                            key={this.key('reset')}
-                            type="text"
-                            name="reset"
-                          />
-                        </Control>
-                      </Field>
+                      <Fieldset>
+                        <Field>
+                          <Control>
+                            <Select.Container>
+                              <Select
+                                ref={this.refResetSelect}
+                                onChange={this.onResetChange.bind(this)}
+                                key={this.key('reset')}
+                                name="reset"
+                              >
+                                <Select.Option value="0 0 * * *">Daily at midnight</Select.Option>
+                                <Select.Option value="0 0 * * 1">Weekly on Monday</Select.Option>
+                                <Select.Option value="0 0 1 * *">Monthly on 1st</Select.Option>
+                                <Select.Option value="custom">Custom (CRON string)</Select.Option>
+                              </Select>
+                            </Select.Container>
+                          </Control>
+                        </Field>
+                        <Field>
+                          <Control>
+                            <Input
+                              hidden={this.state.hideCustomReset}
+                              id="input-reset-custom"
+                              key={this.key('reset_custom')}
+                              type="text"
+                              name="reset_custom"
+                            />
+                          </Control>
+                        </Field>
+                      </Fieldset>
                     </Field.Body>
                   </Field>
                   <Field horizontal>
@@ -332,6 +396,7 @@ class NewTournament extends Component<Props, State> {
                           placeholder="Metadata"
                           rows={3}
                           name="metadata"
+                          defaultValue={data && JSON.stringify(data.metadata)}
                         />
                       </Control>
                     </Field>
@@ -358,15 +423,19 @@ class NewTournament extends Component<Props, State> {
   }
 }
 
-const mapStateToProps = ({new_tournament}: ApplicationState) => ({
+const mapStateToProps = ({new_tournament, tournament_details}: ApplicationState) => ({
   loading: new_tournament.loading,
   errors: new_tournament.errors,
-  data: new_tournament.data
+  created: new_tournament.data,
+  data: tournament_details.data
 });
 
 const mapDispatchToProps = (dispatch: Dispatch) => ({
   createRequest: (data: NewTournamentRequest) => dispatch(
     tournamentActions.tournamentCreateRequest(data)
+  ),
+  fetchRequest: (data: TournamentReference) => dispatch(
+    tournamentActions.tournamentFetchRequest(data)
   )
 });
 

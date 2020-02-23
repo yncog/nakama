@@ -20,7 +20,8 @@ import {
   faLink,
   faSignOutAlt,
   faTrash,
-  faUsersCog
+  faUsersCog,
+  faClone
 } from '@fortawesome/free-solid-svg-icons';
 
 import Index from './routes/index';
@@ -53,7 +54,8 @@ library.add(
   faLink,
   faSignOutAlt,
   faTrash,
-  faUsersCog
+  faUsersCog,
+  faClone
 );
 
 const sagaMiddleware = createSagaMiddleware();
@@ -85,6 +87,7 @@ ReactDOM.render(
         <Route path="/users/:id" component={UsersDetails}/>
         <Route path="/users" component={Users}/>
         <Route path="/tournaments/new" component={NewTournament}/>
+        <Route path="/tournaments/clone/:id" component={NewTournament}/>
         <Route path="/tournaments/:id" component={TournamentsDetails}/>
         <Route path="/tournaments" component={Tournaments}/>
         <Route path="/configuration" component={Configuration}/>

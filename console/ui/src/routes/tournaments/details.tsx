@@ -84,6 +84,12 @@ class TournamentDetails extends Component<Props, State> {
     }
   }
 
+  public clone(id: string) {
+    const {history, match} = this.props;
+    let data = match.params as TournamentReference;
+    history.push(`/tournaments/clone/${data.id}`);
+  }
+
   public download(format: string) {
     const {data} = this.props;
     const element = document.createElement('a');
@@ -124,6 +130,16 @@ class TournamentDetails extends Component<Props, State> {
                 </Level.Item>
               </Level.Item>
               <Level.Item align="right">
+                <Level.Item>
+                  <Button
+                    onClick={this.clone.bind(this)}
+                  >
+                    <Icon>
+                      <FontAwesomeIcon icon="clone"/>
+                    </Icon>
+                    <span>Clone</span>
+                  </Button>
+                </Level.Item>
                 <Level.Item>
                   <Dropdown hoverable>
                     <Dropdown.Trigger>
