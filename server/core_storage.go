@@ -186,7 +186,7 @@ func StorageListObjectsAll(ctx context.Context, logger *zap.Logger, db *sql.DB, 
 		query = `
 SELECT collection, key, user_id, value, version, read, write, create_time, update_time FROM storage` +
 			whereClause +
-			` ORDER BY read ASC, key ASC, user_id ASC LIMIT $1`
+			` ORDER BY collection ASC, read ASC, key ASC, user_id ASC LIMIT $1`
 	} else {
 		where = append(where, `read >= 2`)
 
@@ -196,7 +196,7 @@ SELECT collection, key, user_id, value, version, read, write, create_time, updat
 		query = `
 SELECT collection, key, user_id, value, version, read, write, create_time, update_time FROM storage WHERE ` +
 			whereClause +
-			` ORDER BY read ASC, key ASC, user_id ASC LIMIT $1`
+			` ORDER BY collection ASC, read ASC, key ASC, user_id ASC LIMIT $1`
 	}
 
 	var objects *api.StorageObjectList
@@ -245,7 +245,7 @@ func StorageListObjectsPublicReadUser(ctx context.Context, logger *zap.Logger, d
 	query := `
 SELECT collection, key, user_id, value, version, read, write, create_time, update_time FROM storage WHERE ` +
 		whereClause +
-		` ORDER BY key ASC LIMIT $1`
+		` ORDER BY collection ASC, key ASC LIMIT $1`
 
 	var objects *api.StorageObjectList
 	err := ExecuteRetryable(func() error {
@@ -298,14 +298,14 @@ func StorageListObjectsUser(ctx context.Context, logger *zap.Logger, db *sql.DB,
 		query = `
 SELECT collection, key, user_id, value, version, read, write, create_time, update_time FROM storage WHERE ` +
 			whereClause +
-			` ORDER BY read ASC, key ASC LIMIT $1`
+			` ORDER BY collection ASC, read ASC, key ASC LIMIT $1`
 	} else {
 		where = append(where, "read >= 1")
 		whereClause = strings.Join(where, " AND ")
 		query = `
 SELECT collection, key, user_id, value, version, read, write, create_time, update_time FROM storage WHERE ` +
 			whereClause +
-			` ORDER BY read ASC, key ASC LIMIT $1`
+			` ORDER BY collection ASC, read ASC, key ASC LIMIT $1`
 	}
 
 	var objects *api.StorageObjectList
