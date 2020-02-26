@@ -71,7 +71,7 @@ func (s *ApiServer) ListStorageObjects(ctx context.Context, in *api.ListStorageO
 		userID = &uid
 	}
 
-	storageObjectList, code, listingError := StorageListObjects(ctx, s.logger, s.db, caller, userID, in.GetCollection(), limit, in.GetCursor())
+	storageObjectList, code, listingError := StorageListObjects(ctx, s.logger, s.db, caller, userID, in.GetCollection(), "", limit, in.GetCursor())
 
 	if listingError != nil {
 		if code == codes.Internal {

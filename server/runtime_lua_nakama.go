@@ -191,6 +191,7 @@ func (n *RuntimeLuaNakamaModule) Loader(l *lua.LState) int {
 		"wallet_ledger_update":        n.walletLedgerUpdate,
 		"wallet_ledger_list":          n.walletLedgerList,
 		"storage_list":                n.storageList,
+		"storage_list_full":           n.storageListFull,
 		"storage_read":                n.storageRead,
 		"storage_write":               n.storageWrite,
 		"storage_delete":              n.storageDelete,
@@ -3646,7 +3647,19 @@ func (n *RuntimeLuaNakamaModule) storageList(l *lua.LState) int {
 	collection := l.OptString(2, "")
 	limit := l.CheckInt(3)
 	cursor := l.OptString(4, "")
+	return n.storageLookup(userIDString, collection, "", limit, cursor, l)
+}
 
+func (n *RuntimeLuaNakamaModule) storageListFull(l *lua.LState) int {
+	userIDString := l.OptString(1, "")
+	collection := l.OptString(2, "")
+	key := l.OptString(3, "")
+	limit := l.CheckInt(4)
+	cursor := l.OptString(5, "")
+	return n.storageLookup(userIDString, collection, key, limit, cursor, l)
+}
+
+func (n *RuntimeLuaNakamaModule) storageLookup(userIDString, collection, key string, limit int, cursor string, l *lua.LState) int {
 	var userID *uuid.UUID
 	if userIDString != "" {
 		uid, err := uuid.FromString(userIDString)
@@ -3657,7 +3670,7 @@ func (n *RuntimeLuaNakamaModule) storageList(l *lua.LState) int {
 		userID = &uid
 	}
 
-	objectList, _, err := StorageListObjects(l.Context(), n.logger, n.db, uuid.Nil, userID, collection, limit, cursor)
+	objectList, _, err := StorageListObjects(l.Context(), n.logger, n.db, uuid.Nil, userID, collection, key, limit, cursor)
 	if err != nil {
 		l.RaiseError(fmt.Sprintf("failed to list storage objects: %s", err.Error()))
 		return 0

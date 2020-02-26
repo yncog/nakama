@@ -1062,7 +1062,7 @@ func (n *RuntimeGoNakamaModule) StorageList(ctx context.Context, userID, collect
 		uid = &u
 	}
 
-	objectList, _, err := StorageListObjects(ctx, n.logger, n.db, uuid.Nil, uid, collection, limit, cursor)
+	objectList, _, err := StorageListObjects(ctx, n.logger, n.db, uuid.Nil, uid, collection, "", limit, cursor)
 	if err != nil {
 		return nil, "", err
 	}

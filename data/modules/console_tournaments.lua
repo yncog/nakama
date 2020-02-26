@@ -2,7 +2,7 @@ local nk = require("nakama")
 
 local FOREVER = 3600*24*365*10 -- 10 years
 
---- Ensure the rpc is only called as http REST from an authorized server (using http_key)
+--- Ensure the rpc is only called from the console
 local function _http_request(context, payload)
     if context.user_id then
         error("Invalid")

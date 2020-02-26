@@ -1858,7 +1858,7 @@ func TestStorageListRuntimeUser(t *testing.T) {
 	assert.NotNil(t, acks, "acks was nil")
 	assert.Len(t, acks.Acks, 3, "acks length was not 3")
 
-	list, code, err := server.StorageListObjects(context.Background(), logger, db, uuid.Nil, &uid, "testcollection", 10, "")
+	list, code, err := server.StorageListObjects(context.Background(), logger, db, uuid.Nil, &uid, "testcollection", "", 10, "")
 
 	assert.Nil(t, err, "err was not nil")
 	assert.Equal(t, codes.OK, code, "code was not OK")
@@ -1915,7 +1915,7 @@ func TestStorageListPipelineUserSelf(t *testing.T) {
 	assert.NotNil(t, acks, "acks was nil")
 	assert.Len(t, acks.Acks, 3, "acks length was not 3")
 
-	list, code, err := server.StorageListObjects(context.Background(), logger, db, uid, &uid, collection, 10, "")
+	list, code, err := server.StorageListObjects(context.Background(), logger, db, uid, &uid, collection, "", 10, "")
 
 	assert.Nil(t, err, "err was not nil")
 	assert.Equal(t, codes.OK, code, "code was not OK")
@@ -1974,7 +1974,7 @@ func TestStorageListPipelineUserOther(t *testing.T) {
 	assert.NotNil(t, acks, "acks was nil")
 	assert.Len(t, acks.Acks, 3, "acks length was not 3")
 
-	values, code, err := server.StorageListObjects(context.Background(), logger, db, uuid.Must(uuid.NewV4()), &uid, collection, 10, "")
+	values, code, err := server.StorageListObjects(context.Background(), logger, db, uuid.Must(uuid.NewV4()), &uid, collection, "", 10, "")
 
 	assert.Nil(t, err, "err was not nil")
 	assert.Equal(t, codes.OK, code, "code was not OK")
@@ -2071,7 +2071,7 @@ func TestStorageListNoRepeats(t *testing.T) {
 	assert.NotNil(t, acks, "acks was nil")
 	assert.Len(t, acks.Acks, 7, "acks length was not 7")
 
-	values, code, err := server.StorageListObjects(context.Background(), logger, db, uuid.Must(uuid.NewV4()), &uid, collection, 10, "")
+	values, code, err := server.StorageListObjects(context.Background(), logger, db, uuid.Must(uuid.NewV4()), &uid, collection, "", 10, "")
 
 	assert.Nil(t, err, "err was not nil")
 	assert.Equal(t, codes.OK, code, "code was not OK")

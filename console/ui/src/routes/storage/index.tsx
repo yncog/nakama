@@ -93,6 +93,14 @@ class Storage extends Component<Props, State>
     fetchManyRequest({user_id});
   }
 
+  public reset() 
+  {
+    (document.getElementById('user_id') as HTMLInputElement).value = '';
+    (document.getElementById('collection') as HTMLInputElement).value = '';
+    (document.getElementById('key') as HTMLInputElement).value = '';
+    this.filter('');
+  }
+
   public upload(format: null|string, event: React.FormEvent<Element>)
   {
     event.stopPropagation();
@@ -201,30 +209,6 @@ class Storage extends Component<Props, State>
                     ~<strong>{data.total_count || 0}</strong> objects
                   </Title>
                 </Level.Item>
-
-                <Level.Item>
-                  <Button
-                    title="Select system-owned objects."
-                    onClick={this.filter.bind(this, '00000000-0000-0000-0000-000000000000')}
-                  >
-                    <Icon>
-                      <FontAwesomeIcon icon="users-cog" />
-                    </Icon>
-                  </Button>
-                </Level.Item>
-
-                <Level.Item>
-                  <Field kind="addons">
-                    <Control expanded>
-                      <Input id="user_id" type="text" placeholder="Find objects for user" />
-                    </Control>
-                    <Control>
-                      <Button
-                        onClick={this.filter.bind(this, '')}
-                      >Lookup</Button>
-                    </Control>
-                  </Field>
-                </Level.Item>
               </Level.Item>
 
               <Level.Item align="right">
@@ -276,6 +260,48 @@ class Storage extends Component<Props, State>
                     </Icon>
                     <span>Delete All</span>
                   </Button>
+                </Level.Item>
+              </Level.Item>
+            </Level>
+            <Level>
+              <Level.Item align="left">
+                <Level.Item>
+                  <Field kind="addons">
+                    <Control>
+                      <Button
+                      title="Select system-owned objects."
+                      onClick={this.filter.bind(this, '00000000-0000-0000-0000-000000000000')}
+                    >
+                      <Icon>
+                        <FontAwesomeIcon icon="users-cog" />
+                      </Icon>
+                    </Button>
+                    </Control>
+                    <Control expanded>
+                      <Input id="user_id" type="text" placeholder="User id of owner" />
+                    </Control>
+                    <Control expanded>
+                      <Input id="collection" type="text" placeholder="Collection name" />
+                    </Control>
+                    <Control expanded>
+                      <Input id="key" type="text" placeholder="Key" />
+                    </Control>
+                    <Control>
+                      <Button
+                        onClick={this.filter.bind(this, '')}
+                        color="info"
+                      >Lookup</Button>
+                    </Control>
+                  </Field>
+                </Level.Item>
+
+                <Level.Item>
+                    <Control>
+                      <Button
+                        onClick={this.reset.bind(this)}
+                        color="danger"
+                      >Reset</Button>
+                    </Control>
                 </Level.Item>
               </Level.Item>
             </Level>

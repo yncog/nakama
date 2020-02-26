@@ -22,8 +22,10 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx"
 	"sort"
+	"strings"
+
+	"github.com/jackc/pgx"
 
 	"context"
 
@@ -42,9 +44,10 @@ var (
 )
 
 type storageCursor struct {
-	Key    string
-	UserID uuid.UUID
-	Read   int32
+	Collection string
+	Key        string
+	UserID     uuid.UUID
+	Read       int32
 }
 
 // Internal representation for a batch of storage write operations.
@@ -97,7 +100,7 @@ func (s StorageOpDeletes) Less(i, j int) bool {
 	return s1.OwnerID < s2.OwnerID
 }
 
-func StorageListObjects(ctx context.Context, logger *zap.Logger, db *sql.DB, caller uuid.UUID, ownerID *uuid.UUID, collection string, limit int, cursor string) (*api.StorageObjectList, codes.Code, error) {
+func StorageListObjects(ctx context.Context, logger *zap.Logger, db *sql.DB, caller uuid.UUID, ownerID *uuid.UUID, collection string, key string, limit int, cursor string) (*api.StorageObjectList, codes.Code, error) {
 	var sc *storageCursor
 	if cursor != "" {
 		sc = &storageCursor{}
@@ -112,6 +115,10 @@ func StorageListObjects(ctx context.Context, logger *zap.Logger, db *sql.DB, cal
 		}
 	}
 
+	if limit < 1 {
+		limit = 1
+	}
+
 	var result *api.StorageObjectList
 	var resultErr error
 
@@ -120,22 +127,22 @@ func StorageListObjects(ctx context.Context, logger *zap.Logger, db *sql.DB, cal
 		if ownerID == nil {
 			// List storage regardless of user.
 			// TODO
-			result, resultErr = StorageListObjectsAll(ctx, logger, db, true, collection, limit, cursor, sc)
+			result, resultErr = StorageListObjectsAll(ctx, logger, db, true, collection, key, limit, cursor, sc)
 		} else {
 			// List for a particular user ID.
-			result, resultErr = StorageListObjectsUser(ctx, logger, db, true, *ownerID, collection, limit, cursor, sc)
+			result, resultErr = StorageListObjectsUser(ctx, logger, db, true, *ownerID, collection, key, limit, cursor, sc)
 		}
 	} else {
 		// Call from a client.
 		if ownerID == nil {
 			// List publicly readable storage regardless of owner.
-			result, resultErr = StorageListObjectsAll(ctx, logger, db, false, collection, limit, cursor, sc)
+			result, resultErr = StorageListObjectsAll(ctx, logger, db, false, collection, key, limit, cursor, sc)
 		} else if o := *ownerID; caller == o {
 			// User listing their own data.
-			result, resultErr = StorageListObjectsUser(ctx, logger, db, false, o, collection, limit, cursor, sc)
+			result, resultErr = StorageListObjectsUser(ctx, logger, db, false, o, collection, key, limit, cursor, sc)
 		} else {
 			// User listing someone else's data.
-			result, resultErr = StorageListObjectsPublicReadUser(ctx, logger, db, o, collection, limit, cursor, sc)
+			result, resultErr = StorageListObjectsPublicReadUser(ctx, logger, db, o, collection, key, limit, cursor, sc)
 		}
 	}
 
@@ -146,36 +153,50 @@ func StorageListObjects(ctx context.Context, logger *zap.Logger, db *sql.DB, cal
 	return result, codes.OK, nil
 }
 
-func StorageListObjectsAll(ctx context.Context, logger *zap.Logger, db *sql.DB, authoritative bool, collection string, limit int, cursor string, storageCursor *storageCursor) (*api.StorageObjectList, error) {
-	cursorQuery := ""
-	params := []interface{}{collection, limit + 1}
+func StorageListObjectsAll(ctx context.Context, logger *zap.Logger, db *sql.DB, authoritative bool, collection, key string, limit int, cursor string, storageCursor *storageCursor) (*api.StorageObjectList, error) {
+	where := make([]string, 0, 4)
+	params := []interface{}{limit + 1}
 	if storageCursor != nil {
 		if authoritative {
 			// Authoritative listings observe the read permission in the cursor.
-			cursorQuery = ` AND (collection, read, key, user_id) > ($1, $3, $4, $5) `
-			params = append(params, storageCursor.Read, storageCursor.Key, storageCursor.UserID)
+			where = append(where, `(collection, read, key, user_id) > ($2, $3, $4, $5)`)
+			params = append(params, storageCursor.Collection, storageCursor.Read, storageCursor.Key, storageCursor.UserID)
 		} else {
 			// Non-authoritative listings can only ever list for read permission 2 in this type of listing.
-			cursorQuery = ` AND (collection, read, key, user_id) > ($1, 2, $3, $4) `
-			params = append(params, storageCursor.Key, storageCursor.UserID)
+			where = append(where, `(collection, read, key, user_id) > ($2, 2, $3, $4)`)
+			params = append(params, storageCursor.Collection, storageCursor.Key, storageCursor.UserID)
 		}
+	}
+
+	if collection != "" {
+		params = append(params, collection)
+		where = append(where, fmt.Sprintf("collection = $%d", len(params)))
+	}
+	if key != "" {
+		params = append(params, key)
+		where = append(where, fmt.Sprintf("key = $%d", len(params)))
 	}
 
 	var query string
 	if authoritative {
+		whereClause := strings.Join(where, " AND ")
+		if whereClause != "" {
+			whereClause = " WHERE " + whereClause
+		}
 		query = `
-SELECT collection, key, user_id, value, version, read, write, create_time, update_time
-FROM storage
-WHERE collection = $1` + cursorQuery + `
-ORDER BY read ASC, key ASC, user_id ASC
-LIMIT $2`
+SELECT collection, key, user_id, value, version, read, write, create_time, update_time FROM storage` +
+			whereClause +
+			` ORDER BY read ASC, key ASC, user_id ASC LIMIT $1`
 	} else {
+		where = append(where, `read >= 2`)
+
+		//there's always at least the "read >= 2" piece
+		whereClause := strings.Join(where, " AND ")
+
 		query = `
-SELECT collection, key, user_id, value, version, read, write, create_time, update_time
-FROM storage
-WHERE collection = $1 AND read >= 2` + cursorQuery + `
-ORDER BY read ASC, key ASC, user_id ASC
-LIMIT $2`
+SELECT collection, key, user_id, value, version, read, write, create_time, update_time FROM storage WHERE ` +
+			whereClause +
+			` ORDER BY read ASC, key ASC, user_id ASC LIMIT $1`
 	}
 
 	var objects *api.StorageObjectList
@@ -202,21 +223,29 @@ LIMIT $2`
 	return objects, err
 }
 
-func StorageListObjectsPublicReadUser(ctx context.Context, logger *zap.Logger, db *sql.DB, userID uuid.UUID, collection string, limit int, cursor string, storageCursor *storageCursor) (*api.StorageObjectList, error) {
-	cursorQuery := ""
-	params := []interface{}{collection, userID, limit + 1}
+func StorageListObjectsPublicReadUser(ctx context.Context, logger *zap.Logger, db *sql.DB, userID uuid.UUID, collection, key string, limit int, cursor string, storageCursor *storageCursor) (*api.StorageObjectList, error) {
+	where := make([]string, 0, 4)
+	params := []interface{}{limit + 1, userID}
 	if storageCursor != nil {
 		// Ignore cursor read permission and user ID, the listing operation itself is only scoped to one user and public read permission.
-		cursorQuery = ` AND (collection, read, user_id, key) > ($1, 2, $2, $4) `
-		params = append(params, storageCursor.Key)
+		where = append(where, `(collection, read, user_id, key) > ($3, 2, $2, $4)`)
+		params = append(params, storageCursor.Collection, storageCursor.Key)
 	}
 
+	if collection != "" {
+		params = append(params, collection)
+		where = append(where, fmt.Sprintf("collection = $%d", len(params)))
+	}
+	if key != "" {
+		params = append(params, key)
+		where = append(where, fmt.Sprintf("key = $%d", len(params)))
+	}
+	where = append(where, "read = 2 AND user_id = $2")
+	whereClause := strings.Join(where, " AND ")
 	query := `
-SELECT collection, key, user_id, value, version, read, write, create_time, update_time
-FROM storage
-WHERE collection = $1 AND read = 2 AND user_id = $2 ` + cursorQuery + `
-ORDER BY key ASC
-LIMIT $3`
+SELECT collection, key, user_id, value, version, read, write, create_time, update_time FROM storage WHERE ` +
+		whereClause +
+		` ORDER BY key ASC LIMIT $1`
 
 	var objects *api.StorageObjectList
 	err := ExecuteRetryable(func() error {
@@ -242,29 +271,41 @@ LIMIT $3`
 	return objects, err
 }
 
-func StorageListObjectsUser(ctx context.Context, logger *zap.Logger, db *sql.DB, authoritative bool, userID uuid.UUID, collection string, limit int, cursor string, storageCursor *storageCursor) (*api.StorageObjectList, error) {
-	cursorQuery := ""
-	params := []interface{}{collection, userID, limit + 1}
+func StorageListObjectsUser(ctx context.Context, logger *zap.Logger, db *sql.DB, authoritative bool, userID uuid.UUID, collection, key string, limit int, cursor string, storageCursor *storageCursor) (*api.StorageObjectList, error) {
+	where := make([]string, 0, 4)
+	params := []interface{}{limit + 1, userID}
 	if storageCursor != nil {
 		// User ID is always a known user based on the type of the listing operation.
-		cursorQuery = ` AND (collection, user_id, read, key) > ($1, $2, $4, $5) `
-		params = append(params, storageCursor.Read, storageCursor.Key)
+		where = append(where, `(collection, user_id, read, key) > ($3, $2, $4, $5)`)
+		params = append(params, storageCursor.Collection, storageCursor.Read, storageCursor.Key)
 	}
 
-	query := `
-SELECT collection, key, user_id, value, version, read, write, create_time, update_time
-FROM storage
-WHERE collection = $1 AND user_id = $2 AND read >= 1 ` + cursorQuery + `
-ORDER BY read ASC, key ASC
-LIMIT $3`
+	if collection != "" {
+		params = append(params, collection)
+		where = append(where, fmt.Sprintf("collection = $%d", len(params)))
+	}
+	if key != "" {
+		params = append(params, key)
+		where = append(where, fmt.Sprintf("key = $%d", len(params)))
+	}
+	where = append(where, "user_id = $2")
+
+	var query, whereClause string
 	if authoritative {
+		where = append(where, "read >= 0")
+		whereClause = strings.Join(where, " AND ")
 		// List across all read permissions.
 		query = `
-SELECT collection, key, user_id, value, version, read, write, create_time, update_time
-FROM storage
-WHERE collection = $1 AND user_id = $2 AND read >= 0 ` + cursorQuery + `
-ORDER BY read ASC, key ASC
-LIMIT $3`
+SELECT collection, key, user_id, value, version, read, write, create_time, update_time FROM storage WHERE ` +
+			whereClause +
+			` ORDER BY read ASC, key ASC LIMIT $1`
+	} else {
+		where = append(where, "read >= 1")
+		whereClause = strings.Join(where, " AND ")
+		query = `
+SELECT collection, key, user_id, value, version, read, write, create_time, update_time FROM storage WHERE ` +
+			whereClause +
+			` ORDER BY read ASC, key ASC LIMIT $1`
 	}
 
 	var objects *api.StorageObjectList
@@ -345,8 +386,9 @@ func storageListObjects(rows *sql.Rows, limit int) (*api.StorageObjectList, erro
 		// If we've read enough, but there is at least 1 more, use the last read as the cursor and stop here.
 		if len(objects) >= limit && lastObject != nil {
 			newCursor = &storageCursor{
-				Key:  lastObject.Key,
-				Read: lastObject.PermissionRead,
+				Collection: lastObject.Collection,
+				Key:        lastObject.Key,
+				Read:       lastObject.PermissionRead,
 			}
 			if lastObject.UserId != "" {
 				newCursor.UserID = uuid.FromStringOrNil(lastObject.UserId)
