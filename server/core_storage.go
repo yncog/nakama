@@ -199,6 +199,8 @@ SELECT collection, key, user_id, value, version, read, write, create_time, updat
 			` ORDER BY collection ASC, read ASC, key ASC, user_id ASC LIMIT $1`
 	}
 
+	logger.Debug("Storage list all query", zap.String("query", query), zap.Any("params", params))
+
 	var objects *api.StorageObjectList
 	err := ExecuteRetryable(func() error {
 		rows, err := db.QueryContext(ctx, query, params...)
@@ -247,6 +249,7 @@ SELECT collection, key, user_id, value, version, read, write, create_time, updat
 		whereClause +
 		` ORDER BY collection ASC, key ASC LIMIT $1`
 
+	logger.Debug("Storage list user's public query", zap.String("query", query), zap.Any("params", params))
 	var objects *api.StorageObjectList
 	err := ExecuteRetryable(func() error {
 		rows, err := db.QueryContext(ctx, query, params...)
@@ -308,6 +311,7 @@ SELECT collection, key, user_id, value, version, read, write, create_time, updat
 			` ORDER BY collection ASC, read ASC, key ASC LIMIT $1`
 	}
 
+	logger.Debug("Storage list user's query", zap.String("query", query), zap.Any("params", params))
 	var objects *api.StorageObjectList
 	err := ExecuteRetryable(func() error {
 		rows, err := db.QueryContext(ctx, query, params...)

@@ -1,5 +1,6 @@
 import {AnyAction} from 'redux';
 import {all, call, fork, put, takeEvery} from 'redux-saga/effects';
+import {doConsoleRpc} from '../common';
 import {StorageActionTypes} from './types';
 import {
   storageFetchManySuccess,
@@ -16,13 +17,14 @@ import {
   storageDeleteError
 } from './actions';
 
-function* handleFetchMany({payload: data}: AnyAction)
+function* handleFetchMany({payload}: AnyAction)
 {
   try
   {
     const res = yield call(
-      window.nakama_api.listStorage,
-      data && data.user_id
+      doConsoleRpc,
+      'list_storage',
+      payload
     );
     if(res.error)
     {

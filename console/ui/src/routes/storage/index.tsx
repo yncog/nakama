@@ -24,10 +24,12 @@ import {
   Input,
   Level,
   Notification,
+  Pagination,
   Section,
   Table,
   Title
 } from 'rbx';
+
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 
 import Header from '../../components/header';
@@ -62,10 +64,14 @@ type State = {
 
 class Storage extends Component<Props, State>
 {
+  
+  previousCursors: string[];
+  cursor: string | undefined;
   public constructor(props: Props)
   {
     super(props);
     this.state = {format: null, uploaded: false, failed: false};
+    this.previousCursors = [];
   }
 
   public componentDidMount()
@@ -75,30 +81,61 @@ class Storage extends Component<Props, State>
     {
       (document.getElementById('user_id') as HTMLInputElement).value = query.user_id as string;
     }
-    this.props.fetchManyRequest(query);
+    this.filter();
   }
 
-  public filter(user_id: string)
+  public filter(direction?:number)
   {
-    const {history, fetchManyRequest} = this.props;
-    if(user_id)
+    const {fetchManyRequest, data} = this.props;
+    
+    let payload:any = {};
+    ["user_id", "collection", "key"].forEach((v) => { 
+      payload[v] = (document.getElementById(v) as HTMLInputElement).value;
+    });
+
+    switch (direction) {
+      case 1:
+        if(!data.cursor)
+        {
+          return;
+        }
+        this.previousCursors.push(this.cursor || "");
+        this.cursor = data.cursor;
+        payload["cursor"] = this.cursor as string;
+        break;
+      case -1:
+        if(this.previousCursors.length < 1)
+        {
+          return;
+        }
+        this.cursor = this.previousCursors.pop();
+        payload["cursor"] = this.cursor as string;
+        break;
+      default:
+        this.previousCursors = [];
+        this.cursor = undefined;
+        break;
+    }
+
+    fetchManyRequest(payload as StorageObjectRequest);
+  }
+
+  public reset(user_id: string|undefined, collection: string|undefined, key: string|undefined) 
+  {
+    if(user_id !== undefined)
     {
       (document.getElementById('user_id') as HTMLInputElement).value = user_id;
     }
-    else
+    if(collection !== undefined)
     {
-      user_id = (document.getElementById('user_id') as HTMLInputElement).value;
+      (document.getElementById('collection') as HTMLInputElement).value = collection;
     }
-    history.push(`/storage?user_id=${user_id}`);
-    fetchManyRequest({user_id});
-  }
 
-  public reset() 
-  {
-    (document.getElementById('user_id') as HTMLInputElement).value = '';
-    (document.getElementById('collection') as HTMLInputElement).value = '';
-    (document.getElementById('key') as HTMLInputElement).value = '';
-    this.filter('');
+    if(key !== undefined)
+    {
+      (document.getElementById('key') as HTMLInputElement).value = key || '';
+    }
+    this.filter();
   }
 
   public upload(format: null|string, event: React.FormEvent<Element>)
@@ -188,12 +225,16 @@ class Storage extends Component<Props, State>
       } as StorageObjectRequest;
 
       this.props.deleteRequest(request);
+
     }
   }
 
   public render()
   {
-    const {data} = this.props;
+    let {data} = this.props;
+    if (!data || !data.total_count|| !data.objects){
+      data = {objects:[], total_count:0}
+    }
     const {format, uploaded, failed} = this.state;
     return <Generic id="storage">
       <Header />
@@ -270,7 +311,7 @@ class Storage extends Component<Props, State>
                     <Control>
                       <Button
                       title="Select system-owned objects."
-                      onClick={this.filter.bind(this, '00000000-0000-0000-0000-000000000000')}
+                      onClick={this.reset.bind(this, '00000000-0000-0000-0000-000000000000', undefined, undefined)}
                     >
                       <Icon>
                         <FontAwesomeIcon icon="users-cog" />
@@ -288,7 +329,7 @@ class Storage extends Component<Props, State>
                     </Control>
                     <Control>
                       <Button
-                        onClick={this.filter.bind(this, '')}
+                        onClick={this.filter.bind(this)}
                         color="info"
                       >Lookup</Button>
                     </Control>
@@ -298,7 +339,7 @@ class Storage extends Component<Props, State>
                 <Level.Item>
                     <Control>
                       <Button
-                        onClick={this.reset.bind(this)}
+                        onClick={this.reset.bind(this, '', '', '')}
                         color="danger"
                       >Reset</Button>
                     </Control>
@@ -369,6 +410,10 @@ class Storage extends Component<Props, State>
                 }
               </Table.Body>
             </Table>
+            <Pagination>
+              <Pagination.Step align="previous" onClick={this.filter.bind(this, -1)} disabled={this.previousCursors.length < 1}>Previous</Pagination.Step>
+              <Pagination.Step align="next" onClick={this.filter.bind(this, 1)} disabled={!data.cursor}>Next</Pagination.Step>
+            </Pagination>
           </Column>
         </Column.Group>
       </Section>

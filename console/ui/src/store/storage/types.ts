@@ -22,7 +22,8 @@ export interface StorageObject
 export interface Storages
 {
   objects: StorageObject[],
-  total_count: number
+  total_count: number,
+  cursor?: string,
 };
 
 export enum StorageActionTypes

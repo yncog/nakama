@@ -11,22 +11,26 @@ end
 local function list(context, payload)
     local request = _http_request(context, payload)
     
-    local objects = nk.storage_list_full(
+    local objects, cursor = nk.storage_list_full(
         request.user_id or "",
         request.collection or "",
         request.key or "",
         request.limit or 50,
         request.cursor or ""
     )
-    
-    if ~objects then
-        objects = {}
-    end
 
     local res = {}
-    res["data"] = objects
-    return nk.json_encode(objects)
-    
+    if objects and #objects > 0 then
+        res["objects"] = objects
+        if cursor then
+            res["cursor"] = cursor
+        end
+        res["total_count"] = #objects
+    else
+        res["total_count"] = 0
+    end
+
+    return nk.json_encode(res)
 end
 
 nk.register_rpc(list, "console.list_storage")
