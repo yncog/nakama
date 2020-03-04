@@ -18,7 +18,7 @@
 
 * **Restart nakama** - Run:
 
-    docker-compose down nakama && docker-compose up -d
+    docker-compose stop nakama && docker-compose up -d
 
 ## Building Nakama
 
