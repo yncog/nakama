@@ -109,10 +109,14 @@ local function list(context, payload)
         request.end_time or -1,
         request.limit or 20)
 
-    local result = {
-        tournaments = tournaments,
-        total_count = #tournaments
-    }
+    local result = {}
+    if tournaments and #tournaments > 0 then
+        result["total_count"] = #tournaments
+        result["tournaments"] = tournaments
+    else
+        result["total_count"] = 0
+    end
+
     return nk.json_encode(result)
 end
 
