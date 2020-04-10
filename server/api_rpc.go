@@ -122,6 +122,7 @@ func (s *ApiServer) RpcFuncHttp(w http.ResponseWriter, r *http.Request) {
 		b, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			// Error reading request body.
+			s.logger.Error("Error reading RPC request body", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Header().Set("content-type", "application/json")
 			_, err := w.Write(internalServerErrorBytes)
