@@ -110,110 +110,111 @@ func NewRuntimeLuaNakamaModule(logger *zap.Logger, db *sql.DB, jsonpbMarshaler *
 
 func (n *RuntimeLuaNakamaModule) Loader(l *lua.LState) int {
 	functions := map[string]lua.LGFunction{
-		"register_rpc":                n.registerRPC,
-		"register_req_before":         n.registerReqBefore,
-		"register_req_after":          n.registerReqAfter,
-		"register_rt_before":          n.registerRTBefore,
-		"register_rt_after":           n.registerRTAfter,
-		"register_matchmaker_matched": n.registerMatchmakerMatched,
-		"register_tournament_end":     n.registerTournamentEnd,
-		"register_tournament_reset":   n.registerTournamentReset,
-		"register_leaderboard_reset":  n.registerLeaderboardReset,
-		"run_once":                    n.runOnce,
-		"get_context":                 n.getContext,
-		"localcache_get":              n.localcacheGet,
-		"localcache_put":              n.localcachePut,
-		"localcache_delete":           n.localcacheDelete,
-		"time":                        n.time,
-		"cron_next":                   n.cronNext,
-		"sql_exec":                    n.sqlExec,
-		"sql_query":                   n.sqlQuery,
-		"uuid_v4":                     n.uuidV4,
-		"uuid_bytes_to_string":        n.uuidBytesToString,
-		"uuid_string_to_bytes":        n.uuidStringToBytes,
-		"http_request":                n.httpRequest,
-		"jwt_generate":                n.jwtGenerate,
-		"json_encode":                 n.jsonEncode,
-		"json_decode":                 n.jsonDecode,
-		"base64_encode":               n.base64Encode,
-		"base64_decode":               n.base64Decode,
-		"base64url_encode":            n.base64URLEncode,
-		"base64url_decode":            n.base64URLDecode,
-		"base16_encode":               n.base16Encode,
-		"base16_decode":               n.base16Decode,
-		"aes128_encrypt":              n.aes128Encrypt,
-		"aes128_decrypt":              n.aes128Decrypt,
-		"aes256_encrypt":              n.aes256Encrypt,
-		"aes256_decrypt":              n.aes256Decrypt,
-		"md5_hash":                    n.md5Hash,
-		"sha256_hash":                 n.sha256Hash,
-		"hmac_sha256_hash":            n.hmacSHA256Hash,
-		"rsa_sha256_hash":             n.rsaSHA256Hash,
-		"bcrypt_hash":                 n.bcryptHash,
-		"bcrypt_compare":              n.bcryptCompare,
-		"authenticate_custom":         n.authenticateCustom,
-		"authenticate_device":         n.authenticateDevice,
-		"authenticate_email":          n.authenticateEmail,
-		"authenticate_facebook":       n.authenticateFacebook,
-		"authenticate_gamecenter":     n.authenticateGameCenter,
-		"authenticate_google":         n.authenticateGoogle,
-		"authenticate_steam":          n.authenticateSteam,
-		"authenticate_token_generate": n.authenticateTokenGenerate,
-		"logger_info":                 n.loggerInfo,
-		"logger_warn":                 n.loggerWarn,
-		"logger_error":                n.loggerError,
-		"account_get_id":              n.accountGetId,
-		"accounts_get_id":             n.accountsGetId,
-		"account_update_id":           n.accountUpdateId,
-		"account_delete_id":           n.accountDeleteId,
-		"account_export_id":           n.accountExportId,
-		"users_get_id":                n.usersGetId,
-		"users_get_username":          n.usersGetUsername,
-		"users_ban_id":                n.usersBanId,
-		"users_unban_id":              n.usersUnbanId,
-		"stream_user_list":            n.streamUserList,
-		"stream_user_get":             n.streamUserGet,
-		"stream_user_join":            n.streamUserJoin,
-		"stream_user_update":          n.streamUserUpdate,
-		"stream_user_leave":           n.streamUserLeave,
-		"stream_user_kick":            n.streamUserKick,
-		"stream_count":                n.streamCount,
-		"stream_close":                n.streamClose,
-		"stream_send":                 n.streamSend,
-		"stream_send_raw":             n.streamSendRaw,
-		"session_disconnect":          n.sessionDisconnect,
-		"match_create":                n.matchCreate,
-		"match_list":                  n.matchList,
-		"notification_send":           n.notificationSend,
-		"notifications_send":          n.notificationsSend,
-		"wallet_update":               n.walletUpdate,
-		"wallets_update":              n.walletsUpdate,
-		"wallet_ledger_update":        n.walletLedgerUpdate,
-		"wallet_ledger_list":          n.walletLedgerList,
-		"storage_list":                n.storageList,
-		"storage_list_full":           n.storageListFull,
-		"storage_read":                n.storageRead,
-		"storage_write":               n.storageWrite,
-		"storage_delete":              n.storageDelete,
-		"leaderboard_create":          n.leaderboardCreate,
-		"leaderboard_delete":          n.leaderboardDelete,
-		"leaderboard_records_list":    n.leaderboardRecordsList,
-		"leaderboard_record_write":    n.leaderboardRecordWrite,
-		"leaderboard_record_delete":   n.leaderboardRecordDelete,
-		"tournament_create":           n.tournamentCreate,
-		"tournament_delete":           n.tournamentDelete,
-		"tournament_add_attempt":      n.tournamentAddAttempt,
-		"tournament_join":             n.tournamentJoin,
-		"tournament_list":             n.tournamentList,
-		"tournaments_get_id":          n.tournamentsGetId,
-		"tournament_record_write":     n.tournamentRecordWrite,
-		"tournament_records_haystack": n.tournamentRecordsHaystack,
-		"groups_get_id":               n.groupsGetId,
-		"group_create":                n.groupCreate,
-		"group_update":                n.groupUpdate,
-		"group_delete":                n.groupDelete,
-		"group_users_list":            n.groupUsersList,
-		"user_groups_list":            n.userGroupsList,
+		"register_rpc":                 n.registerRPC,
+		"register_req_before":          n.registerReqBefore,
+		"register_req_after":           n.registerReqAfter,
+		"register_rt_before":           n.registerRTBefore,
+		"register_rt_after":            n.registerRTAfter,
+		"register_matchmaker_matched":  n.registerMatchmakerMatched,
+		"register_tournament_end":      n.registerTournamentEnd,
+		"register_tournament_reset":    n.registerTournamentReset,
+		"register_leaderboard_reset":   n.registerLeaderboardReset,
+		"run_once":                     n.runOnce,
+		"get_context":                  n.getContext,
+		"localcache_get":               n.localcacheGet,
+		"localcache_put":               n.localcachePut,
+		"localcache_delete":            n.localcacheDelete,
+		"time":                         n.time,
+		"cron_next":                    n.cronNext,
+		"sql_exec":                     n.sqlExec,
+		"sql_query":                    n.sqlQuery,
+		"uuid_v4":                      n.uuidV4,
+		"uuid_bytes_to_string":         n.uuidBytesToString,
+		"uuid_string_to_bytes":         n.uuidStringToBytes,
+		"http_request":                 n.httpRequest,
+		"jwt_generate":                 n.jwtGenerate,
+		"json_encode":                  n.jsonEncode,
+		"json_decode":                  n.jsonDecode,
+		"base64_encode":                n.base64Encode,
+		"base64_decode":                n.base64Decode,
+		"base64url_encode":             n.base64URLEncode,
+		"base64url_decode":             n.base64URLDecode,
+		"base16_encode":                n.base16Encode,
+		"base16_decode":                n.base16Decode,
+		"aes128_encrypt":               n.aes128Encrypt,
+		"aes128_decrypt":               n.aes128Decrypt,
+		"aes256_encrypt":               n.aes256Encrypt,
+		"aes256_decrypt":               n.aes256Decrypt,
+		"md5_hash":                     n.md5Hash,
+		"sha256_hash":                  n.sha256Hash,
+		"hmac_sha256_hash":             n.hmacSHA256Hash,
+		"rsa_sha256_hash":              n.rsaSHA256Hash,
+		"bcrypt_hash":                  n.bcryptHash,
+		"bcrypt_compare":               n.bcryptCompare,
+		"authenticate_custom":          n.authenticateCustom,
+		"authenticate_device":          n.authenticateDevice,
+		"authenticate_email":           n.authenticateEmail,
+		"authenticate_facebook":        n.authenticateFacebook,
+		"authenticate_gamecenter":      n.authenticateGameCenter,
+		"authenticate_google":          n.authenticateGoogle,
+		"authenticate_steam":           n.authenticateSteam,
+		"authenticate_token_generate":  n.authenticateTokenGenerate,
+		"logger_info":                  n.loggerInfo,
+		"logger_warn":                  n.loggerWarn,
+		"logger_error":                 n.loggerError,
+		"account_get_id":               n.accountGetId,
+		"accounts_get_id":              n.accountsGetId,
+		"account_update_id":            n.accountUpdateId,
+		"account_delete_id":            n.accountDeleteId,
+		"account_export_id":            n.accountExportId,
+		"users_get_id":                 n.usersGetId,
+		"users_get_username":           n.usersGetUsername,
+		"users_ban_id":                 n.usersBanId,
+		"users_unban_id":               n.usersUnbanId,
+		"stream_user_list":             n.streamUserList,
+		"stream_user_get":              n.streamUserGet,
+		"stream_user_join":             n.streamUserJoin,
+		"stream_user_update":           n.streamUserUpdate,
+		"stream_user_leave":            n.streamUserLeave,
+		"stream_user_kick":             n.streamUserKick,
+		"stream_count":                 n.streamCount,
+		"stream_close":                 n.streamClose,
+		"stream_send":                  n.streamSend,
+		"stream_send_raw":              n.streamSendRaw,
+		"session_disconnect":           n.sessionDisconnect,
+		"match_create":                 n.matchCreate,
+		"match_list":                   n.matchList,
+		"notification_send":            n.notificationSend,
+		"notifications_send":           n.notificationsSend,
+		"wallet_update":                n.walletUpdate,
+		"wallets_update":               n.walletsUpdate,
+		"wallet_ledger_update":         n.walletLedgerUpdate,
+		"wallet_ledger_list":           n.walletLedgerList,
+		"storage_list":                 n.storageList,
+		"storage_list_full":            n.storageListFull,
+		"storage_read":                 n.storageRead,
+		"storage_write":                n.storageWrite,
+		"storage_delete":               n.storageDelete,
+		"leaderboard_create":           n.leaderboardCreate,
+		"leaderboard_delete":           n.leaderboardDelete,
+		"leaderboard_records_list":     n.leaderboardRecordsList,
+		"leaderboard_record_write":     n.leaderboardRecordWrite,
+		"leaderboard_record_delete":    n.leaderboardRecordDelete,
+		"leaderboard_records_haystack": n.leaderboardRecordsHaystack,
+		"tournament_create":            n.tournamentCreate,
+		"tournament_delete":            n.tournamentDelete,
+		"tournament_add_attempt":       n.tournamentAddAttempt,
+		"tournament_join":              n.tournamentJoin,
+		"tournament_list":              n.tournamentList,
+		"tournaments_get_id":           n.tournamentsGetId,
+		"tournament_record_write":      n.tournamentRecordWrite,
+		"tournament_records_haystack":  n.tournamentRecordsHaystack,
+		"groups_get_id":                n.groupsGetId,
+		"group_create":                 n.groupCreate,
+		"group_update":                 n.groupUpdate,
+		"group_delete":                 n.groupDelete,
+		"group_users_list":             n.groupUsersList,
+		"user_groups_list":             n.userGroupsList,
 	}
 	mod := l.SetFuncs(l.CreateTable(0, len(functions)), functions)
 
@@ -4362,6 +4363,76 @@ func (n *RuntimeLuaNakamaModule) leaderboardRecordsList(l *lua.LState) int {
 		l.Push(lua.LNil)
 	}
 	return 4
+}
+
+func (n *RuntimeLuaNakamaModule) leaderboardRecordsHaystack(l *lua.LState) int {
+	id := l.CheckString(1)
+	if id == "" {
+		l.ArgError(1, "expects a leaderboard ID string")
+		return 0
+	}
+
+	userID, err := uuid.FromString(l.CheckString(2))
+	if err != nil {
+		l.ArgError(2, "expects user ID to be a valid identifier")
+		return 0
+	}
+
+	limit := l.OptInt(3, 10)
+	if limit < 1 || limit > 100 {
+		l.ArgError(3, "limit must be 1-100")
+		return 0
+	}
+
+	expiry := l.OptInt(4, 0)
+	if expiry < 0 {
+		l.ArgError(4, "expiry should be time since epoch in seconds and has to be a positive integer")
+		return 0
+	}
+
+	records, err := LeaderboardRecordsHaystack(l.Context(), n.logger, n.db, n.leaderboardCache, n.rankCache, id, userID, limit, int64(expiry))
+	if err != nil {
+		l.RaiseError("error listing leaderboard records haystack: %v", err.Error())
+		return 0
+	}
+
+	recordsTable := l.CreateTable(len(records), 0)
+	for i, record := range records {
+		recordTable := l.CreateTable(0, 10)
+
+		recordTable.RawSetString("leaderboard_id", lua.LString(record.LeaderboardId))
+		recordTable.RawSetString("owner_id", lua.LString(record.OwnerId))
+		if record.Username != nil {
+			recordTable.RawSetString("username", lua.LString(record.Username.Value))
+		} else {
+			recordTable.RawSetString("username", lua.LNil)
+		}
+		recordTable.RawSetString("score", lua.LNumber(record.Score))
+		recordTable.RawSetString("subscore", lua.LNumber(record.Subscore))
+		recordTable.RawSetString("num_score", lua.LNumber(record.NumScore))
+
+		metadataMap := make(map[string]interface{})
+		err = json.Unmarshal([]byte(record.Metadata), &metadataMap)
+		if err != nil {
+			l.RaiseError(fmt.Sprintf("failed to convert metadata to json: %s", err.Error()))
+			return 0
+		}
+		metadataTable := RuntimeLuaConvertMap(l, metadataMap)
+		recordTable.RawSetString("metadata", metadataTable)
+
+		recordTable.RawSetString("create_time", lua.LNumber(record.CreateTime.Seconds))
+		recordTable.RawSetString("update_time", lua.LNumber(record.UpdateTime.Seconds))
+		if record.ExpiryTime != nil {
+			recordTable.RawSetString("expiry_time", lua.LNumber(record.ExpiryTime.Seconds))
+		} else {
+			recordTable.RawSetString("expiry_time", lua.LNil)
+		}
+
+		recordsTable.RawSetInt(i+1, recordTable)
+	}
+	l.Push(recordsTable)
+
+	return 1
 }
 
 func (n *RuntimeLuaNakamaModule) leaderboardRecordWrite(l *lua.LState) int {
