@@ -165,7 +165,7 @@ func (b *baseBalancer) mergeErrors() error {
 // from it. The picker is
 //  - errPicker if the balancer is in TransientFailure,
 //  - built by the pickerBuilder with all READY SubConns otherwise.
-func (b *baseBalancer) regeneratePicker(err error) {
+func (b *baseBalancer) regeneratePicker() {
 	if b.state == connectivity.TransientFailure {
 		if b.pickerBuilder != nil {
 			b.picker = NewErrPicker(balancer.ErrTransientFailure)
@@ -236,7 +236,7 @@ func (b *baseBalancer) UpdateSubConnState(sc balancer.SubConn, state balancer.Su
 	//  - the aggregated state of balancer became non-TransientFailure from TransientFailure
 	if (s == connectivity.Ready) != (oldS == connectivity.Ready) ||
 		(b.state == connectivity.TransientFailure) != (oldAggrState == connectivity.TransientFailure) {
-		b.regeneratePicker(state.ConnectionError)
+		b.regeneratePicker()
 	}
 
 	if b.picker != nil {

@@ -1,4 +1,4 @@
 #!/bin/bash
-version=2.10.0
+version=2.11.1
 commit=$(git rev-parse --short HEAD)
 docker build "$PWD" --build-arg commit="${commit}" --build-arg version="v${version}-${commit}" -t "yncog/nakama:${version}" -t "yncog/nakama:latest"
