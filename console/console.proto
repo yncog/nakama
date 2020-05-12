@@ -53,14 +53,19 @@ option (grpc.gateway.protoc_gen_swagger.options.openapiv2_swagger) = {
         type: TYPE_BASIC;
       }
     }
-  };
+    security: {
+      // Made up security so we can apply "Bearer <JWT_TOKEN>"
+      key: "BearerJwt";
+      value: {};
+    }
+  }
   // Default security definition.
   security: {
     security_requirement: {
-      key: "BasicAuth";
+      key: "BearerJwt";
       value: {};
     }
-  };
+  },
 };
 
 /**
@@ -75,8 +80,8 @@ service Console {
     };
     option (grpc.gateway.protoc_gen_swagger.options.openapiv2_operation) = {
       security: {
-        security_requirement: {}
-      }
+        security_requirement: {};
+      };
     };
   }
 
@@ -201,6 +206,11 @@ service Console {
   // Unlink the Facebook ID from a user account.
   rpc UnlinkFacebook (AccountId) returns (google.protobuf.Empty) {
     option (google.api.http).post = "/v2/console/account/{id}/unlink/facebook";
+  }
+
+  // Unlink the Facebook ID from a user account.
+  rpc UnlinkFacebookInstantGame (AccountId) returns (google.protobuf.Empty) {
+    option (google.api.http).post = "/v2/console/account/{id}/unlink/facebookinstantgame";
   }
 
   // Unlink the Game Center ID from a user account.

@@ -5,10 +5,33 @@ The format is based on [keep a changelog](http://keepachangelog.com) and this pr
 
 ## [Unreleased]
 ### Added
-- Return tournament end time in listing operations if one exists.
+- Print a log message when all authoritative messages have stopped during graceful shutdown.
+- Option for read-only globals in Lua runtime to reduce memory footprint. Enabled by default.
+- Independent config flags for socket read and write buffer sizes.
 
 ### Changed
-- Build with Go 1.13.8 release.
+- Strictly validate authoritative match create parameter encoding.
+- Build with Go 1.14.2 release.
+
+### Fixed
+- Ensure runtime environment values do not appear multiple times in the devconsole configuration view.
+- Channel presence events now populate room, group, and direct message fields.
+
+## [2.11.1] - 2020-03-29
+### Changed
+- Update protobuf (1.3.5), websocket (1.4.2), opencensus (0.22.3), atomic (1.6.0), zap (1.14.1) dependencies.
+- Update devconsole minimist (1.2.2), acorn (6.4.1) dependencies.
+- Build with Go 1.14.1 release.
+
+## [2.11.0] - 2020-02-27
+### Added
+- Return tournament end time in listing operations if one exists.
+- Add Facebook Instant Game Authentication method.
+
+### Changed
+- Build with Go 1.14.0 release.
+- Update most server dependencies (particularly GRPC, GRPC Gateway, and Protobuf).
+- Upgrade to use nakama-common 1.4.0 release.
 
 ## [2.10.0] - 2020-02-13
 ### Added

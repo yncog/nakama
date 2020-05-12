@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"database/sql"
+
 	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/rtapi"
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -142,4 +143,8 @@ func eventSessionStart(ctx context.Context, logger runtime.Logger, evt *api.Even
 
 func eventSessionEnd(ctx context.Context, logger runtime.Logger, evt *api.Event) {
 	logger.Printf("session end %v %v", ctx, evt)
+}
+
+func main() {
+
 }
