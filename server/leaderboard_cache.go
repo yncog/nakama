@@ -141,6 +141,7 @@ func (t OrderedTournaments) Less(i, j int) bool {
 type LeaderboardCache interface {
 	Get(id string) *Leaderboard
 	GetAllLeaderboards() []*Leaderboard
+	ListPureLeaderboards(limit int, cursor *LeaderboardListCursor) ([]*Leaderboard, *LeaderboardListCursor, error)
 	RefreshAllLeaderboards(ctx context.Context) error
 	Create(ctx context.Context, id string, authoritative bool, sortOrder, operator int, resetSchedule, metadata string) (*Leaderboard, error)
 	Insert(id string, authoritative bool, sortOrder, operator int, resetSchedule, metadata string, createTime int64)

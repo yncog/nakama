@@ -1,24 +1,7 @@
 local nk = require("nakama")
+local Util = require("console_util")
 
 local FOREVER = 3600*24*365*10 -- 10 years
-
---- Ensure the rpc is only called from the console
-local function _http_request(context, payload)
-    if context.user_id then
-        error("Invalid")
-    end
-    return nk.json_decode(payload)
-end
-
-local function _trim_empty(request)
-    -- remove all empty strings
-    for key, value in pairs(request) do
-        if value == "" then
-            request[key] = nil
-        end
-    end
-    return request
-end
 
 local function _validate_create_request(request)
     if request.start_time and type(request.start_time) ~= "number" then
@@ -68,7 +51,7 @@ local function _parse_end_time(end_time)
 end
 
 local function create(context, payload)
-    local request = _trim_empty(_http_request(context, payload))
+    local request = Util.trim_empty(Util.http_request(context, payload))
     _validate_create_request(request)
 
     local id = nk.uuid_v4()
@@ -92,7 +75,7 @@ end
 nk.register_rpc(create, "console.create_tournament")
 
 local function delete(context, payload)
-    local request = _http_request(context, payload)
+    local request = Util.http_request(context, payload)
 
     nk.tournament_delete(request.id)
 end
@@ -100,7 +83,7 @@ end
 nk.register_rpc(delete, "console.delete_tournament")
 
 local function list(context, payload)
-    local request = _http_request(context, payload)
+    local request = Util.http_request(context, payload)
 
     local tournaments = nk.tournament_list(
         request.categoryStart or 0,
@@ -123,7 +106,7 @@ end
 nk.register_rpc(list, "console.list_tournaments")
 
 local function get(context, payload)
-    local request = _http_request(context, payload)
+    local request = Util.http_request(context, payload)
     local ids = {request.id}
     local tournaments = nk.tournaments_get_id(ids)
 

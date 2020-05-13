@@ -1,15 +1,8 @@
 local nk = require("nakama")
-
---- Ensure the rpc is only called from the console
-local function _http_request(context, payload)
-    if context.user_id then
-        error("Invalid")
-    end
-    return nk.json_decode(payload)
-end
+local Util = require("console_util")
 
 local function list(context, payload)
-    local request = _http_request(context, payload)
+    local request = Util.http_request(context, payload)
     
     local objects, cursor = nk.storage_list_full(
         request.user_id or "",

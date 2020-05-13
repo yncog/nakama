@@ -198,6 +198,8 @@ func (n *RuntimeLuaNakamaModule) Loader(l *lua.LState) int {
 		"storage_delete":                     n.storageDelete,
 		"leaderboard_create":                 n.leaderboardCreate,
 		"leaderboard_delete":                 n.leaderboardDelete,
+		"leaderboards_get_id":                n.leaderboardsGetId,
+		"leaderboard_list":                   n.leaderboardList,
 		"leaderboard_records_list":           n.leaderboardRecordsList,
 		"leaderboard_record_write":           n.leaderboardRecordWrite,
 		"leaderboard_record_delete":          n.leaderboardRecordDelete,
@@ -4576,6 +4578,74 @@ func (n *RuntimeLuaNakamaModule) leaderboardRecordDelete(l *lua.LState) int {
 		l.RaiseError("error deleting leaderboard record: %v", err.Error())
 	}
 	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) leaderboardsGetId(l *lua.LState) int {
+	// Input table validation.
+	input := l.OptTable(1, nil)
+	if input == nil {
+		l.ArgError(1, "invalid leaderboard id list")
+		return 0
+	}
+	if input.Len() == 0 {
+		l.Push(l.CreateTable(0, 0))
+		return 1
+	}
+	leaderboardIDs, ok := RuntimeLuaConvertLuaValue(input).([]interface{})
+	if !ok {
+		l.ArgError(1, "invalid leaderboard id data")
+		return 0
+	}
+	if len(leaderboardIDs) == 0 {
+		l.Push(l.CreateTable(0, 0))
+		return 1
+	}
+
+	// Input individual ID validation.
+	leaderboardIDStrings := make([]string, 0, len(leaderboardIDs))
+	for _, id := range leaderboardIDs {
+		if ids, ok := id.(string); !ok || ids == "" {
+			l.ArgError(1, "each leaderboard id must be a string")
+			return 0
+		} else {
+			leaderboardIDStrings = append(leaderboardIDStrings, ids)
+		}
+	}
+
+	// Get the tournaments.
+	list, err := LeaderboardsGet(l.Context(), n.logger, n.db, leaderboardIDStrings)
+	if err != nil {
+		l.RaiseError(fmt.Sprintf("failed to get leaderboards: %s", err.Error()))
+		return 0
+	}
+
+	leaderboards := l.CreateTable(len(list), 0)
+	for i, lb := range list {
+		tt := l.CreateTable(0, 17)
+
+		tt.RawSetString("id", lua.LString(lb.Id))
+		tt.RawSetString("authoritative", lua.LBool(lb.Authoritative))
+		if lb.SortOrder == LeaderboardSortOrderAscending {
+			tt.RawSetString("sort_order", lua.LString("asc"))
+		} else {
+			tt.RawSetString("sort_order", lua.LString("desc"))
+		}
+		tt.RawSetString("next_reset", lua.LNumber(lb.NextReset))
+		metadataMap := make(map[string]interface{})
+		err = json.Unmarshal([]byte(lb.Metadata), &metadataMap)
+		if err != nil {
+			l.RaiseError(fmt.Sprintf("failed to convert metadata to json: %s", err.Error()))
+			return 0
+		}
+		metadataTable := RuntimeLuaConvertMap(l, metadataMap)
+		tt.RawSetString("metadata", metadataTable)
+		tt.RawSetString("create_time", lua.LNumber(lb.CreateTime.Seconds))
+
+		leaderboards.RawSetInt(i+1, tt)
+	}
+	l.Push(leaderboards)
+
+	return 1
 }
 
 func (n *RuntimeLuaNakamaModule) tournamentCreate(l *lua.LState) int {

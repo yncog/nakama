@@ -52,6 +52,13 @@ class Sidebar extends Component<Props, State>
             >Tournaments</Link>
             
           </Menu.List.Item>
+          <Menu.List.Item as="span">
+            <Link
+              to="/leaderboards"
+              className={cn({'is-active': this.props.active === 'leaderboards'})}
+            >Leaderboards</Link>
+            
+          </Menu.List.Item>
         </Menu.List>
       </Menu>
     </Column>;

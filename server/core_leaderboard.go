@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/gob"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/heroiclabs/nakama-common/api"
+	"github.com/heroiclabs/nakama/v2/cronexpr"
 	"github.com/jackc/pgx/pgtype"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -38,6 +40,21 @@ var (
 	ErrLeaderboardAuthoritative = errors.New("leaderboard only allows authoritative submissions")
 	ErrLeaderboardInvalidCursor = errors.New("leaderboard cursor invalid")
 )
+
+type LeaderboardDao struct {
+	// The ID of the leaderboard.
+	Id string `json:"id,omitempty"`
+	// If the leaderboard is authoritative.
+	Authoritative bool `json:"authoritative,omitempty"`
+	// ASC or DESC sort mode of scores in the leaderboard.
+	SortOrder uint32 `json:"sort_order,omitempty"`
+	// The UNIX time when the leaderboard is reset next. A computed value.
+	NextReset uint32 `json:"next_reset,omitempty"`
+	// Additional information stored as a JSON object.
+	Metadata string `json:"metadata,omitempty"`
+	// The UNIX time when the leaderboard was created.
+	CreateTime *timestamp.Timestamp `json:"create_time,omitempty"`
+}
 
 type leaderboardRecordListCursor struct {
 	// Query hint.
@@ -301,6 +318,43 @@ func LeaderboardRecordsList(ctx context.Context, logger *zap.Logger, db *sql.DB,
 		NextCursor:   nextCursorStr,
 		PrevCursor:   prevCursorStr,
 	}, nil
+}
+
+func LeaderboardsGet(ctx context.Context, logger *zap.Logger, db *sql.DB, leaderboardIDs []string) ([]*LeaderboardDao, error) {
+	now := time.Now().UTC()
+
+	params := make([]interface{}, 0, len(leaderboardIDs))
+	statements := make([]string, 0, len(leaderboardIDs))
+	for i, leaderboardID := range leaderboardIDs {
+		params = append(params, leaderboardID)
+		statements = append(statements, fmt.Sprintf("$%v", i+1))
+	}
+	query := `SELECT id, authoritative, sort_order, metadata, reset_schedule, create_time
+FROM leaderboard
+WHERE id IN (` + strings.Join(statements, ",") + `)`
+
+	// Retrieved directly from database to have the latest configuration and 'size' etc field values.
+	// Ensures consistency between return data from this call and LeaderboardList.
+	rows, err := db.QueryContext(ctx, query, params...)
+	if err != nil {
+		logger.Error("Could not retrieve leaderboards", zap.Error(err))
+		return nil, err
+	}
+
+	records := make([]*LeaderboardDao, 0, len(leaderboardIDs))
+	for rows.Next() {
+		leaderboard, err := parseLeaderboard(rows, now)
+		if err != nil {
+			_ = rows.Close()
+			logger.Error("Error parsing retrieved leaderboard records", zap.Error(err))
+			return nil, err
+		}
+
+		records = append(records, leaderboard)
+	}
+	_ = rows.Close()
+
+	return records, nil
 }
 
 func LeaderboardRecordWrite(ctx context.Context, logger *zap.Logger, db *sql.DB, leaderboardCache LeaderboardCache, rankCache LeaderboardRankCache, caller uuid.UUID, leaderboardId, ownerID, username string, score, subscore int64, metadata string) (*api.LeaderboardRecord, error) {
@@ -672,4 +726,36 @@ func calculateExpiryOverride(overrideExpiry int64, leaderboard *Leaderboard) (in
 		}
 	}
 	return overrideExpiry, true
+}
+
+func parseLeaderboard(scannable Scannable, now time.Time) (*LeaderboardDao, error) {
+	var dbID string
+	var dbAuthoritative bool
+	var dbSortOrder int
+	var dbMetadata string
+	var dbResetSchedule sql.NullString
+	var dbCreateTime pgtype.Timestamptz
+
+	err := scannable.Scan(&dbID, &dbAuthoritative, &dbSortOrder, &dbMetadata, &dbResetSchedule, &dbCreateTime)
+	if err != nil {
+		return nil, err
+	}
+
+	expiryTime := int64(0)
+	if dbResetSchedule.Valid {
+		if resetSchedule := cronexpr.MustParse(dbResetSchedule.String); resetSchedule != nil {
+			expiryTime = resetSchedule.Next(time.Now().UTC()).UTC().Unix()
+		}
+	}
+
+	leaderboard := LeaderboardDao{
+		Id:            dbID,
+		Authoritative: dbAuthoritative,
+		SortOrder:     uint32(dbSortOrder),
+		NextReset:     uint32(expiryTime),
+		Metadata:      dbMetadata,
+		CreateTime:    &timestamp.Timestamp{Seconds: dbCreateTime.Time.UTC().Unix()},
+	}
+
+	return &leaderboard, nil
 }
