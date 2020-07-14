@@ -17,6 +17,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -31,12 +32,16 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const (
+	RPCNotFoundErrorMessageTemplate = "RPC function not found: %s"
+	RPCNotFoundErrorTemplate        = `{"error":"RPC function not found","message":"%s","code":5}`
+)
+
 var (
 	authTokenInvalidBytes    = []byte(`{"error":"Auth token invalid","message":"Auth token invalid","code":16}`)
 	httpKeyInvalidBytes      = []byte(`{"error":"HTTP key invalid","message":"HTTP key invalid","code":16}`)
 	noAuthBytes              = []byte(`{"error":"Auth token or HTTP key required","message":"Auth token or HTTP key required","code":16}`)
 	rpcIDMustBeSetBytes      = []byte(`{"error":"RPC ID must be set","message":"RPC ID must be set","code":3}`)
-	rpcFunctionNotFoundBytes = []byte(`{"error":"RPC function not found","message":"RPC function not found","code":5}`)
 	internalServerErrorBytes = []byte(`{"error":"Internal Server Error","message":"Internal Server Error","code":13}`)
 	badJSONBytes             = []byte(`{"error":"json: cannot unmarshal object into Go value of type string","message":"json: cannot unmarshal object into Go value of type string","code":3}`)
 )
@@ -104,7 +109,8 @@ func (s *ApiServer) RpcFuncHttp(w http.ResponseWriter, r *http.Request) {
 		// No function registered for this ID.
 		w.WriteHeader(http.StatusNotFound)
 		w.Header().Set("content-type", "application/json")
-		_, err := w.Write(rpcFunctionNotFoundBytes)
+		errData := []byte(fmt.Sprintf(RPCNotFoundErrorTemplate, fmt.Sprintf(RPCNotFoundErrorMessageTemplate, id)))
+		_, err := w.Write(errData)
 		if err != nil {
 			s.logger.Debug("Error writing response to client", zap.Error(err))
 		}
@@ -215,7 +221,7 @@ func (s *ApiServer) RpcFunc(ctx context.Context, in *api.Rpc) (*api.Rpc, error) 
 
 	fn := s.runtime.Rpc(id)
 	if fn == nil {
-		return nil, status.Error(codes.NotFound, "RPC function not found")
+		return nil, status.Error(codes.NotFound, fmt.Sprintf(RPCNotFoundErrorMessageTemplate, id))
 	}
 
 	queryParams := make(map[string][]string, 0)

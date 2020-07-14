@@ -17,25 +17,24 @@ package server
 import (
 	"context"
 	"database/sql"
-	"go.uber.org/atomic"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/heroiclabs/nakama-common/runtime"
 
 	"github.com/gofrs/uuid"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/rtapi"
+	"github.com/heroiclabs/nakama-common/runtime"
 	"github.com/heroiclabs/nakama/v2/social"
 	"github.com/pkg/errors"
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 )
 
 var (
-	ErrRuntimeRPCNotFound = errors.New("RPC function not found")
+	ErrRuntimeRPCNotFound = errors.New("RPC function not found - 4")
 )
 
 const API_PREFIX = "/nakama.api.Nakama/"
