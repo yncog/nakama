@@ -34,7 +34,7 @@ import (
 )
 
 var (
-	ErrRuntimeRPCNotFound = errors.New("RPC function not found - 4")
+	ErrRuntimeRPCNotFound = errors.New("RPC function not found")
 )
 
 const API_PREFIX = "/nakama.api.Nakama/"

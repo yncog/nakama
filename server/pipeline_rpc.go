@@ -38,7 +38,7 @@ func (p *Pipeline) rpc(logger *zap.Logger, session Session, envelope *rtapi.Enve
 	if fn == nil {
 		session.Send(&rtapi.Envelope{Cid: envelope.Cid, Message: &rtapi.Envelope_Error{Error: &rtapi.Error{
 			Code:    int32(rtapi.Error_RUNTIME_FUNCTION_NOT_FOUND),
-			Message: "RPC function not found - 3",
+			Message: "RPC function not found",
 		}}}, true)
 		return
 	}
