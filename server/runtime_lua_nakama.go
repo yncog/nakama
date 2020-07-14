@@ -77,9 +77,10 @@ type RuntimeLuaNakamaModule struct {
 
 	node          string
 	matchCreateFn RuntimeMatchCreateFunction
+	eventFn       RuntimeEventCustomFunction
 }
 
-func NewRuntimeLuaNakamaModule(logger *zap.Logger, db *sql.DB, jsonpbMarshaler *jsonpb.Marshaler, jsonpbUnmarshaler *jsonpb.Unmarshaler, config Config, socialClient *social.Client, leaderboardCache LeaderboardCache, rankCache LeaderboardRankCache, leaderboardScheduler LeaderboardScheduler, sessionRegistry SessionRegistry, matchRegistry MatchRegistry, tracker Tracker, streamManager StreamManager, router MessageRouter, once *sync.Once, localCache *RuntimeLuaLocalCache, matchCreateFn RuntimeMatchCreateFunction, registerCallbackFn func(RuntimeExecutionMode, string, *lua.LFunction), announceCallbackFn func(RuntimeExecutionMode, string)) *RuntimeLuaNakamaModule {
+func NewRuntimeLuaNakamaModule(logger *zap.Logger, db *sql.DB, jsonpbMarshaler *jsonpb.Marshaler, jsonpbUnmarshaler *jsonpb.Unmarshaler, config Config, socialClient *social.Client, leaderboardCache LeaderboardCache, rankCache LeaderboardRankCache, leaderboardScheduler LeaderboardScheduler, sessionRegistry SessionRegistry, matchRegistry MatchRegistry, tracker Tracker, streamManager StreamManager, router MessageRouter, once *sync.Once, localCache *RuntimeLuaLocalCache, matchCreateFn RuntimeMatchCreateFunction, eventFn RuntimeEventCustomFunction, registerCallbackFn func(RuntimeExecutionMode, string, *lua.LFunction), announceCallbackFn func(RuntimeExecutionMode, string)) *RuntimeLuaNakamaModule {
 	return &RuntimeLuaNakamaModule{
 		logger:               logger,
 		db:                   db,
@@ -105,6 +106,7 @@ func NewRuntimeLuaNakamaModule(logger *zap.Logger, db *sql.DB, jsonpbMarshaler *
 
 		node:          config.GetName(),
 		matchCreateFn: matchCreateFn,
+		eventFn:       eventFn,
 	}
 }
 
@@ -121,6 +123,7 @@ func (n *RuntimeLuaNakamaModule) Loader(l *lua.LState) int {
 		"register_leaderboard_reset":         n.registerLeaderboardReset,
 		"run_once":                           n.runOnce,
 		"get_context":                        n.getContext,
+		"event":                              n.event,
 		"localcache_get":                     n.localcacheGet,
 		"localcache_put":                     n.localcachePut,
 		"localcache_delete":                  n.localcacheDelete,
@@ -155,11 +158,12 @@ func (n *RuntimeLuaNakamaModule) Loader(l *lua.LState) int {
 		"authenticate_device":                n.authenticateDevice,
 		"authenticate_email":                 n.authenticateEmail,
 		"authenticate_facebook":              n.authenticateFacebook,
-		"authenticate_facebook_instant_game": n.authenticateFacebook,
+		"authenticate_facebook_instant_game": n.authenticateFacebookInstantGame,
 		"authenticate_gamecenter":            n.authenticateGameCenter,
 		"authenticate_google":                n.authenticateGoogle,
 		"authenticate_steam":                 n.authenticateSteam,
 		"authenticate_token_generate":        n.authenticateTokenGenerate,
+		"logger_debug":                       n.loggerDebug,
 		"logger_info":                        n.loggerInfo,
 		"logger_warn":                        n.loggerWarn,
 		"logger_error":                       n.loggerError,
@@ -172,6 +176,22 @@ func (n *RuntimeLuaNakamaModule) Loader(l *lua.LState) int {
 		"users_get_username":                 n.usersGetUsername,
 		"users_ban_id":                       n.usersBanId,
 		"users_unban_id":                     n.usersUnbanId,
+		"link_custom":                        n.linkCustom,
+		"link_device":                        n.linkDevice,
+		"link_email":                         n.linkEmail,
+		"link_facebook":                      n.linkFacebook,
+		"link_facebook_instant_game":         n.linkFacebookInstantGame,
+		"link_gamecenter":                    n.linkGameCenter,
+		"link_google":                        n.linkGoogle,
+		"link_steam":                         n.linkSteam,
+		"unlink_custom":                      n.unlinkCustom,
+		"unlink_device":                      n.unlinkDevice,
+		"unlink_email":                       n.unlinkEmail,
+		"unlink_facebook":                    n.unlinkFacebook,
+		"unlink_facebook_instant_game":       n.unlinkFacebookInstantGame,
+		"unlink_gamecenter":                  n.unlinkGameCenter,
+		"unlink_google":                      n.unlinkGoogle,
+		"unlink_steam":                       n.unlinkSteam,
 		"stream_user_list":                   n.streamUserList,
 		"stream_user_get":                    n.streamUserGet,
 		"stream_user_join":                   n.streamUserJoin,
@@ -184,6 +204,7 @@ func (n *RuntimeLuaNakamaModule) Loader(l *lua.LState) int {
 		"stream_send_raw":                    n.streamSendRaw,
 		"session_disconnect":                 n.sessionDisconnect,
 		"match_create":                       n.matchCreate,
+		"match_get":                          n.matchGet,
 		"match_list":                         n.matchList,
 		"notification_send":                  n.notificationSend,
 		"notifications_send":                 n.notificationsSend,
@@ -379,7 +400,7 @@ func (n *RuntimeLuaNakamaModule) runOnce(l *lua.LState) int {
 			return
 		}
 
-		ctx := NewRuntimeLuaContext(l, RuntimeLuaConvertMapString(l, n.config.GetRuntime().Environment), RuntimeExecutionModeRunOnce, nil, 0, "", "", nil, "", "", "")
+		ctx := NewRuntimeLuaContext(l, n.config.GetName(), RuntimeLuaConvertMapString(l, n.config.GetRuntime().Environment), RuntimeExecutionModeRunOnce, nil, 0, "", "", nil, "", "", "")
 
 		l.Push(LSentinel)
 		l.Push(fn)
@@ -403,9 +424,68 @@ func (n *RuntimeLuaNakamaModule) runOnce(l *lua.LState) int {
 }
 
 func (n *RuntimeLuaNakamaModule) getContext(l *lua.LState) int {
-	ctx := NewRuntimeLuaContext(l, RuntimeLuaConvertMapString(l, n.config.GetRuntime().Environment), RuntimeExecutionModeRunOnce, nil, 0, "", "", nil, "", "", "")
+	ctx := NewRuntimeLuaContext(l, n.config.GetName(), RuntimeLuaConvertMapString(l, n.config.GetRuntime().Environment), RuntimeExecutionModeRunOnce, nil, 0, "", "", nil, "", "", "")
 	l.Push(ctx)
 	return 1
+}
+
+func (n *RuntimeLuaNakamaModule) event(l *lua.LState) int {
+	name := l.CheckString(1)
+	if name == "" {
+		l.ArgError(1, "expects name string")
+		return 0
+	}
+
+	propertiesTable := l.OptTable(2, nil)
+	var properties map[string]string
+	if propertiesTable != nil {
+		var conversionError bool
+		properties = make(map[string]string, propertiesTable.Len())
+		propertiesTable.ForEach(func(k lua.LValue, v lua.LValue) {
+			if conversionError {
+				return
+			}
+
+			if k.Type() != lua.LTString {
+				l.ArgError(2, "properties keys must be strings")
+				conversionError = true
+				return
+			}
+			if v.Type() != lua.LTString {
+				l.ArgError(2, "properties values must be strings")
+				conversionError = true
+				return
+			}
+
+			properties[k.String()] = v.String()
+		})
+
+		if conversionError {
+			return 0
+		}
+	}
+
+	var ts *timestamp.Timestamp
+	t := l.Get(3)
+	if t != lua.LNil {
+		if t.Type() != lua.LTNumber {
+			l.ArgError(3, "timestamp must be numeric UTC seconds when provided")
+			return 0
+		}
+		ts = &timestamp.Timestamp{Seconds: int64(t.(lua.LNumber))}
+	}
+
+	external := l.OptBool(4, false)
+
+	if n.eventFn != nil {
+		n.eventFn(l.Context(), &api.Event{
+			Name:       name,
+			Properties: properties,
+			Timestamp:  ts,
+			External:   external,
+		})
+	}
+	return 0
 }
 
 func (n *RuntimeLuaNakamaModule) localcacheGet(l *lua.LState) int {
@@ -1326,36 +1406,29 @@ func (n *RuntimeLuaNakamaModule) authenticateFacebook(l *lua.LState) int {
 }
 
 func (n *RuntimeLuaNakamaModule) authenticateFacebookInstantGame(l *lua.LState) int {
-	// Parse appSecret.
-	appSecret := l.CheckString(1)
-	if appSecret == "" {
-		l.ArgError(1, "expects the facebook instant game app secret")
-		return 0
-	}
-
 	// Parse access token.
-	signedPlayerInfo := l.CheckString(2)
+	signedPlayerInfo := l.CheckString(1)
 	if signedPlayerInfo == "" {
-		l.ArgError(2, "expects signed player info")
+		l.ArgError(1, "expects signed player info")
 		return 0
 	}
 
 	// Parse username, if any.
-	username := l.OptString(3, "")
+	username := l.OptString(2, "")
 	if username == "" {
 		username = generateUsername()
 	} else if invalidCharsRegex.MatchString(username) {
-		l.ArgError(3, "expects username to be valid, no spaces or control characters allowed")
+		l.ArgError(2, "expects username to be valid, no spaces or control characters allowed")
 		return 0
 	} else if len(username) > 128 {
-		l.ArgError(3, "expects id to be valid, must be 1-128 bytes")
+		l.ArgError(2, "expects id to be valid, must be 1-128 bytes")
 		return 0
 	}
 
 	// Parse create flag, if any.
-	create := l.OptBool(4, true)
+	create := l.OptBool(3, true)
 
-	dbUserID, dbUsername, created, err := AuthenticateFacebook(l.Context(), n.logger, n.db, n.socialClient, appSecret, signedPlayerInfo, create)
+	dbUserID, dbUsername, created, err := AuthenticateFacebookInstantGame(l.Context(), n.logger, n.db, n.socialClient, n.config.GetSocial().FacebookInstantGame.AppSecret, signedPlayerInfo, username, create)
 	if err != nil {
 		l.RaiseError("error authenticating: %v", err.Error())
 		return 0
@@ -1570,6 +1643,17 @@ func (n *RuntimeLuaNakamaModule) getLuaModule(l *lua.LState) string {
 	return strings.TrimPrefix(src[:len(src)-1], n.config.GetRuntime().Path)
 }
 
+func (n *RuntimeLuaNakamaModule) loggerDebug(l *lua.LState) int {
+	message := l.CheckString(1)
+	if message == "" {
+		l.ArgError(1, "expects message string")
+		return 0
+	}
+	n.logger.Debug(message, zap.String("runtime", "lua"))
+	l.Push(lua.LString(message))
+	return 1
+}
+
 func (n *RuntimeLuaNakamaModule) loggerInfo(l *lua.LState) int {
 	message := l.CheckString(1)
 	if message == "" {
@@ -1615,13 +1699,13 @@ func (n *RuntimeLuaNakamaModule) accountGetId(l *lua.LState) int {
 		return 0
 	}
 
-	account, _, err := GetAccount(l.Context(), n.logger, n.db, n.tracker, userID)
+	account, err := GetAccount(l.Context(), n.logger, n.db, n.tracker, userID)
 	if err != nil {
 		l.RaiseError("failed to get account: %s", err.Error())
 		return 0
 	}
 
-	accountTable := l.CreateTable(0, 22)
+	accountTable := l.CreateTable(0, 23)
 	accountTable.RawSetString("user_id", lua.LString(account.User.Id))
 	accountTable.RawSetString("username", lua.LString(account.User.Username))
 	accountTable.RawSetString("display_name", lua.LString(account.User.DisplayName))
@@ -1685,6 +1769,9 @@ func (n *RuntimeLuaNakamaModule) accountGetId(l *lua.LState) int {
 	if account.VerifyTime != nil {
 		accountTable.RawSetString("verify_time", lua.LNumber(account.VerifyTime.Seconds))
 	}
+	if account.DisableTime != nil {
+		accountTable.RawSetString("disable_time", lua.LNumber(account.DisableTime.Seconds))
+	}
 
 	l.Push(accountTable)
 	return 1
@@ -1733,7 +1820,7 @@ func (n *RuntimeLuaNakamaModule) accountsGetId(l *lua.LState) int {
 
 	accountsTable := l.CreateTable(len(accounts), 0)
 	for i, account := range accounts {
-		accountTable := l.CreateTable(0, 21)
+		accountTable := l.CreateTable(0, 23)
 		accountTable.RawSetString("user_id", lua.LString(account.User.Id))
 		accountTable.RawSetString("username", lua.LString(account.User.Username))
 		accountTable.RawSetString("display_name", lua.LString(account.User.DisplayName))
@@ -1743,6 +1830,9 @@ func (n *RuntimeLuaNakamaModule) accountsGetId(l *lua.LState) int {
 		accountTable.RawSetString("timezone", lua.LString(account.User.Timezone))
 		if account.User.FacebookId != "" {
 			accountTable.RawSetString("facebook_id", lua.LString(account.User.FacebookId))
+		}
+		if account.User.FacebookInstantGameId != "" {
+			accountTable.RawSetString("facebook_instant_game_id", lua.LString(account.User.FacebookInstantGameId))
 		}
 		if account.User.GoogleId != "" {
 			accountTable.RawSetString("google_id", lua.LString(account.User.GoogleId))
@@ -1793,6 +1883,9 @@ func (n *RuntimeLuaNakamaModule) accountsGetId(l *lua.LState) int {
 		}
 		if account.VerifyTime != nil {
 			accountTable.RawSetString("verify_time", lua.LNumber(account.VerifyTime.Seconds))
+		}
+		if account.DisableTime != nil {
+			accountTable.RawSetString("disable_time", lua.LNumber(account.DisableTime.Seconds))
 		}
 
 		accountsTable.RawSetInt(i+1, accountTable)
@@ -2054,6 +2147,387 @@ func (n *RuntimeLuaNakamaModule) usersUnbanId(l *lua.LState) int {
 		return 0
 	}
 
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) linkCustom(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	customID := l.CheckString(2)
+	if customID == "" {
+		l.ArgError(2, "expects custom ID string")
+		return 0
+	}
+
+	if err := LinkCustom(l.Context(), n.logger, n.db, id, customID); err != nil {
+		l.RaiseError("error linking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) linkDevice(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	deviceID := l.CheckString(2)
+	if deviceID == "" {
+		l.ArgError(2, "expects device ID string")
+		return 0
+	}
+
+	if err := LinkDevice(l.Context(), n.logger, n.db, id, deviceID); err != nil {
+		l.RaiseError("error linking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) linkEmail(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	email := l.CheckString(2)
+	if email == "" {
+		l.ArgError(2, "expects email string")
+		return 0
+	}
+	password := l.CheckString(3)
+	if password == "" {
+		l.ArgError(3, "expects username string")
+		return 0
+	}
+
+	if err := LinkEmail(l.Context(), n.logger, n.db, id, email, password); err != nil {
+		l.RaiseError("error linking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) linkFacebook(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	username := l.CheckString(2)
+	if username == "" {
+		l.ArgError(2, "expects username string")
+		return 0
+	}
+	token := l.CheckString(3)
+	if token == "" {
+		l.ArgError(3, "expects token string")
+		return 0
+	}
+	importFriends := l.OptBool(4, true)
+
+	if err := LinkFacebook(l.Context(), n.logger, n.db, n.socialClient, n.router, id, username, token, importFriends); err != nil {
+		l.RaiseError("error linking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) linkFacebookInstantGame(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	signedPlayerInfo := l.CheckString(2)
+	if signedPlayerInfo == "" {
+		l.ArgError(2, "expects signed player info string")
+		return 0
+	}
+
+	if err := LinkFacebookInstantGame(l.Context(), n.logger, n.db, n.config, n.socialClient, id, signedPlayerInfo); err != nil {
+		l.RaiseError("error linking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) linkGameCenter(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	playerID := l.CheckString(2)
+	if playerID == "" {
+		l.ArgError(2, "expects player ID string")
+		return 0
+	}
+	bundleID := l.CheckString(3)
+	if bundleID == "" {
+		l.ArgError(3, "expects bundle ID string")
+		return 0
+	}
+	ts := l.CheckInt64(4)
+	if ts == 0 {
+		l.ArgError(4, "expects timestamp value")
+		return 0
+	}
+	salt := l.CheckString(5)
+	if salt == "" {
+		l.ArgError(5, "expects salt string")
+		return 0
+	}
+	signature := l.CheckString(6)
+	if signature == "" {
+		l.ArgError(6, "expects signature string")
+		return 0
+	}
+	publicKeyURL := l.CheckString(7)
+	if publicKeyURL == "" {
+		l.ArgError(7, "expects public key URL string")
+		return 0
+	}
+
+	if err := LinkGameCenter(l.Context(), n.logger, n.db, n.socialClient, id, playerID, bundleID, ts, salt, signature, publicKeyURL); err != nil {
+		l.RaiseError("error linking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) linkGoogle(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	token := l.CheckString(2)
+	if token == "" {
+		l.ArgError(2, "expects token string")
+		return 0
+	}
+
+	if err := LinkGoogle(l.Context(), n.logger, n.db, n.socialClient, id, token); err != nil {
+		l.RaiseError("error linking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) linkSteam(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	token := l.CheckString(2)
+	if token == "" {
+		l.ArgError(2, "expects token string")
+		return 0
+	}
+
+	if err := LinkSteam(l.Context(), n.logger, n.db, n.config, n.socialClient, id, token); err != nil {
+		l.RaiseError("error linking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) unlinkCustom(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	customID := l.CheckString(2)
+	if customID == "" {
+		l.ArgError(2, "expects custom ID string")
+		return 0
+	}
+
+	if err := UnlinkCustom(l.Context(), n.logger, n.db, id, customID); err != nil {
+		l.RaiseError("error unlinking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) unlinkDevice(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	deviceID := l.CheckString(2)
+	if deviceID == "" {
+		l.ArgError(2, "expects device ID string")
+		return 0
+	}
+
+	if err := UnlinkDevice(l.Context(), n.logger, n.db, id, deviceID); err != nil {
+		l.RaiseError("error unlinking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) unlinkEmail(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	email := l.CheckString(2)
+	if email == "" {
+		l.ArgError(2, "expects email string")
+		return 0
+	}
+
+	if err := UnlinkEmail(l.Context(), n.logger, n.db, id, email); err != nil {
+		l.RaiseError("error unlinking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) unlinkFacebook(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	token := l.CheckString(2)
+	if token == "" {
+		l.ArgError(2, "expects token string")
+		return 0
+	}
+
+	if err := UnlinkFacebook(l.Context(), n.logger, n.db, n.socialClient, id, token); err != nil {
+		l.RaiseError("error unlinking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) unlinkFacebookInstantGame(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	signedPlayerInfo := l.CheckString(2)
+	if signedPlayerInfo == "" {
+		l.ArgError(2, "expects signed player info string")
+		return 0
+	}
+
+	if err := UnlinkFacebookInstantGame(l.Context(), n.logger, n.db, n.config, n.socialClient, id, signedPlayerInfo); err != nil {
+		l.RaiseError("error unlinking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) unlinkGameCenter(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	playerID := l.CheckString(2)
+	if playerID == "" {
+		l.ArgError(2, "expects player ID string")
+		return 0
+	}
+	bundleID := l.CheckString(3)
+	if bundleID == "" {
+		l.ArgError(3, "expects bundle ID string")
+		return 0
+	}
+	ts := l.CheckInt64(4)
+	if ts == 0 {
+		l.ArgError(4, "expects timestamp value")
+		return 0
+	}
+	salt := l.CheckString(5)
+	if salt == "" {
+		l.ArgError(5, "expects salt string")
+		return 0
+	}
+	signature := l.CheckString(6)
+	if signature == "" {
+		l.ArgError(6, "expects signature string")
+		return 0
+	}
+	publicKeyURL := l.CheckString(7)
+	if publicKeyURL == "" {
+		l.ArgError(7, "expects public key URL string")
+		return 0
+	}
+
+	if err := UnlinkGameCenter(l.Context(), n.logger, n.db, n.socialClient, id, playerID, bundleID, ts, salt, signature, publicKeyURL); err != nil {
+		l.RaiseError("error unlinking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) unlinkGoogle(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	token := l.CheckString(2)
+	if token == "" {
+		l.ArgError(2, "expects token string")
+		return 0
+	}
+
+	if err := UnlinkGoogle(l.Context(), n.logger, n.db, n.socialClient, id, token); err != nil {
+		l.RaiseError("error unlinking: %v", err.Error())
+	}
+	return 0
+}
+
+func (n *RuntimeLuaNakamaModule) unlinkSteam(l *lua.LState) int {
+	userID := l.CheckString(1)
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		l.ArgError(1, "user ID must be a valid identifier")
+		return 0
+	}
+
+	token := l.CheckString(2)
+	if token == "" {
+		l.ArgError(2, "expects token string")
+		return 0
+	}
+
+	if err := UnlinkSteam(l.Context(), n.logger, n.db, n.config, n.socialClient, id, token); err != nil {
+		l.RaiseError("error unlinking: %v", err.Error())
+	}
 	return 0
 }
 
@@ -3154,6 +3628,35 @@ func (n *RuntimeLuaNakamaModule) matchCreate(l *lua.LState) int {
 	}
 
 	l.Push(lua.LString(id))
+	return 1
+}
+
+func (n *RuntimeLuaNakamaModule) matchGet(l *lua.LState) int {
+	// Parse match ID.
+	id := l.CheckString(1)
+
+	result, err := n.matchRegistry.GetMatch(l.Context(), id)
+	if err != nil {
+		l.RaiseError(fmt.Sprintf("failed to get match: %s", err.Error()))
+		return 0
+	}
+
+	if result == nil {
+		l.Push(lua.LNil)
+		return 1
+	}
+
+	match := l.CreateTable(0, 4)
+	match.RawSetString("match_id", lua.LString(result.MatchId))
+	match.RawSetString("authoritative", lua.LBool(result.Authoritative))
+	if result.Label == nil {
+		match.RawSetString("label", lua.LNil)
+	} else {
+		match.RawSetString("label", lua.LString(result.Label.Value))
+	}
+	match.RawSetString("size", lua.LNumber(result.Size))
+
+	l.Push(match)
 	return 1
 }
 

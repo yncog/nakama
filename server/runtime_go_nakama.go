@@ -183,7 +183,7 @@ func (n *RuntimeGoNakamaModule) AuthenticateFacebook(ctx context.Context, token 
 	return dbUserID, dbUsername, created, err
 }
 
-func (n *RuntimeGoNakamaModule) AuthenticateFacebookInstantGame(ctx context.Context, appSecret string, signedPlayerInfo string, username string, create bool) (string, string, bool, error) {
+func (n *RuntimeGoNakamaModule) AuthenticateFacebookInstantGame(ctx context.Context, signedPlayerInfo string, username string, create bool) (string, string, bool, error) {
 	if signedPlayerInfo == "" {
 		return "", "", false, errors.New("expects signed player info")
 	}
@@ -196,7 +196,7 @@ func (n *RuntimeGoNakamaModule) AuthenticateFacebookInstantGame(ctx context.Cont
 		return "", "", false, errors.New("expects id to be valid, must be 1-128 bytes")
 	}
 
-	return AuthenticateFacebookInstantGame(ctx, n.logger, n.db, n.socialClient, appSecret, signedPlayerInfo, username, create)
+	return AuthenticateFacebookInstantGame(ctx, n.logger, n.db, n.socialClient, n.config.GetSocial().FacebookInstantGame.AppSecret, signedPlayerInfo, username, create)
 }
 
 func (n *RuntimeGoNakamaModule) AuthenticateGameCenter(ctx context.Context, playerID, bundleID string, timestamp int64, salt, signature, publicKeyUrl, username string, create bool) (string, string, bool, error) {
@@ -294,8 +294,12 @@ func (n *RuntimeGoNakamaModule) AccountGetId(ctx context.Context, userID string)
 		return nil, errors.New("invalid user id")
 	}
 
-	acc, _, err := GetAccount(ctx, n.logger, n.db, n.tracker, u)
-	return acc, err
+	account, err := GetAccount(ctx, n.logger, n.db, n.tracker, u)
+	if err != nil {
+		return nil, err
+	}
+
+	return account, nil
 }
 
 func (n *RuntimeGoNakamaModule) AccountsGetId(ctx context.Context, userIDs []string) ([]*api.Account, error) {
@@ -443,6 +447,150 @@ func (n *RuntimeGoNakamaModule) UsersUnbanId(ctx context.Context, userIDs []stri
 	}
 
 	return UnbanUsers(ctx, n.logger, n.db, userIDs)
+}
+
+func (n *RuntimeGoNakamaModule) LinkCustom(ctx context.Context, userID, customID string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return LinkCustom(ctx, n.logger, n.db, id, customID)
+}
+
+func (n *RuntimeGoNakamaModule) LinkDevice(ctx context.Context, userID, deviceID string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return LinkDevice(ctx, n.logger, n.db, id, deviceID)
+}
+
+func (n *RuntimeGoNakamaModule) LinkEmail(ctx context.Context, userID, email, password string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return LinkEmail(ctx, n.logger, n.db, id, email, password)
+}
+
+func (n *RuntimeGoNakamaModule) LinkFacebook(ctx context.Context, userID, username, token string, importFriends bool) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return LinkFacebook(ctx, n.logger, n.db, n.socialClient, n.router, id, username, token, importFriends)
+}
+
+func (n *RuntimeGoNakamaModule) LinkFacebookInstantGame(ctx context.Context, userID, signedPlayerInfo string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return LinkFacebookInstantGame(ctx, n.logger, n.db, n.config, n.socialClient, id, signedPlayerInfo)
+}
+
+func (n *RuntimeGoNakamaModule) LinkGameCenter(ctx context.Context, userID, playerID, bundleID string, timestamp int64, salt, signature, publicKeyUrl string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return LinkGameCenter(ctx, n.logger, n.db, n.socialClient, id, playerID, bundleID, timestamp, salt, signature, publicKeyUrl)
+}
+
+func (n *RuntimeGoNakamaModule) LinkGoogle(ctx context.Context, userID, token string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return LinkGoogle(ctx, n.logger, n.db, n.socialClient, id, token)
+}
+
+func (n *RuntimeGoNakamaModule) LinkSteam(ctx context.Context, userID, token string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return LinkSteam(ctx, n.logger, n.db, n.config, n.socialClient, id, token)
+}
+
+func (n *RuntimeGoNakamaModule) UnlinkCustom(ctx context.Context, userID, customID string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return UnlinkCustom(ctx, n.logger, n.db, id, customID)
+}
+
+func (n *RuntimeGoNakamaModule) UnlinkDevice(ctx context.Context, userID, deviceID string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return UnlinkDevice(ctx, n.logger, n.db, id, deviceID)
+}
+
+func (n *RuntimeGoNakamaModule) UnlinkEmail(ctx context.Context, userID, email string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return UnlinkEmail(ctx, n.logger, n.db, id, email)
+}
+
+func (n *RuntimeGoNakamaModule) UnlinkFacebook(ctx context.Context, userID, token string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return UnlinkFacebook(ctx, n.logger, n.db, n.socialClient, id, token)
+}
+
+func (n *RuntimeGoNakamaModule) UnlinkFacebookInstantGame(ctx context.Context, userID, signedPlayerInfo string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return UnlinkFacebookInstantGame(ctx, n.logger, n.db, n.config, n.socialClient, id, signedPlayerInfo)
+}
+
+func (n *RuntimeGoNakamaModule) UnlinkGameCenter(ctx context.Context, userID, playerID, bundleID string, timestamp int64, salt, signature, publicKeyUrl string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return UnlinkGameCenter(ctx, n.logger, n.db, n.socialClient, id, playerID, bundleID, timestamp, salt, signature, publicKeyUrl)
+}
+
+func (n *RuntimeGoNakamaModule) UnlinkGoogle(ctx context.Context, userID, token string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return UnlinkGoogle(ctx, n.logger, n.db, n.socialClient, id, token)
+}
+
+func (n *RuntimeGoNakamaModule) UnlinkSteam(ctx context.Context, userID, token string) error {
+	id, err := uuid.FromString(userID)
+	if err != nil {
+		return errors.New("user ID must be a valid identifier")
+	}
+
+	return UnlinkSteam(ctx, n.logger, n.db, n.config, n.socialClient, id, token)
 }
 
 func (n *RuntimeGoNakamaModule) StreamUserList(mode uint8, subject, subcontext, label string, includeHidden, includeNotHidden bool) ([]runtime.Presence, error) {
@@ -859,6 +1007,10 @@ func (n *RuntimeGoNakamaModule) MatchCreate(ctx context.Context, module string, 
 	n.RUnlock()
 
 	return n.matchRegistry.CreateMatch(ctx, n.logger, fn, module, params)
+}
+
+func (n *RuntimeGoNakamaModule) MatchGet(ctx context.Context, id string) (*api.Match, error) {
+	return n.matchRegistry.GetMatch(ctx, id)
 }
 
 func (n *RuntimeGoNakamaModule) MatchList(ctx context.Context, limit int, authoritative bool, label string, minSize, maxSize *int, query string) ([]*api.Match, error) {

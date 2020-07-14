@@ -3,11 +3,7 @@ module github.com/heroiclabs/nakama/v2
 go 1.13
 
 require (
-	cloud.google.com/go v0.45.1 // indirect
-	contrib.go.opencensus.io/exporter/prometheus v0.1.0
-	contrib.go.opencensus.io/exporter/stackdriver v0.12.7
 	github.com/RoaringBitmap/roaring v0.4.21 // indirect
-	github.com/aws/aws-sdk-go v1.23.16 // indirect
 	github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973 // indirect
 	github.com/blevesearch/bleve v0.8.2
 	github.com/blevesearch/blevex v0.0.0-20180227211930-4b158bb555a3 // indirect
@@ -33,22 +29,23 @@ require (
 	github.com/gobuffalo/packr v1.30.1
 	github.com/gofrs/uuid v0.0.0-20190510204422-abfe1881e60e
 	github.com/golang/protobuf v1.3.5
-	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/go-cmp v0.3.1 // indirect
-	github.com/googleapis/gax-go/v2 v2.0.5 // indirect
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.4
 	github.com/gorilla/websocket v1.4.2
 	github.com/grpc-ecosystem/grpc-gateway v1.13.0
-	github.com/heroiclabs/nakama-common v1.4.0
+	github.com/heroiclabs/nakama-common v1.5.1
 	github.com/jackc/fake v0.0.0-20150926172116-812a484cc733 // indirect
 	github.com/jackc/pgx v3.5.0+incompatible
 	github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af // indirect
 	github.com/jmhodges/levigo v1.0.0 // indirect
 	github.com/lib/pq v1.2.0 // indirect
+	github.com/m3db/prometheus_client_golang v0.8.1 // indirect
+	github.com/m3db/prometheus_client_model v0.1.0 // indirect
+	github.com/m3db/prometheus_common v0.1.0 // indirect
+	github.com/m3db/prometheus_procfs v0.8.1 // indirect
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
-	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v0.9.2 // indirect
@@ -65,18 +62,13 @@ require (
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/tecbot/gorocksdb v0.0.0-20190519120508-025c3cf4ffb4 // indirect
 	github.com/tinylib/msgp v1.1.2 // indirect
+	github.com/uber-go/tally v3.3.16+incompatible
 	github.com/ziutek/mymysql v1.5.4 // indirect
 	go.etcd.io/bbolt v1.3.4 // indirect
-	go.opencensus.io v0.22.3
 	go.uber.org/atomic v1.6.0
 	go.uber.org/zap v1.14.1
 	golang.org/x/crypto v0.0.0-20200323165209-0ec3e9974c59
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
-	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 // indirect
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
-	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd // indirect
-	golang.org/x/text v0.3.2 // indirect
-	google.golang.org/api v0.10.0 // indirect
 	google.golang.org/appengine v1.6.2 // indirect
 	google.golang.org/genproto v0.0.0-20200226201735-46b91f19d98c
 	google.golang.org/grpc v1.27.1

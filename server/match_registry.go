@@ -50,6 +50,7 @@ var (
 	MatchLabelMaxBytes = 2048
 
 	ErrCannotEncodeParams    = errors.New("error creating match: cannot encode params")
+	ErrMatchIdInvalid        = errors.New("match id invalid")
 	ErrMatchLabelTooLong     = errors.New("match label too long, must be 0-2048 bytes")
 	ErrDeferredBroadcastFull = errors.New("too many deferred message broadcasts per tick")
 )
@@ -71,13 +72,11 @@ type MatchRegistry interface {
 	CreateMatch(ctx context.Context, logger *zap.Logger, createFn RuntimeMatchCreateFunction, module string, params map[string]interface{}) (string, error)
 	// Register and initialise a match that's ready to run.
 	NewMatch(logger *zap.Logger, id uuid.UUID, core RuntimeMatchCore, stopped *atomic.Bool, params map[string]interface{}) (*MatchHandler, error)
-	// Return a match handler by ID, only from the local node.
-	GetMatch(id uuid.UUID) *MatchHandler
+	// Return a match by ID.
+	GetMatch(ctx context.Context, id string) (*api.Match, error)
 	// Remove a tracked match and ensure all its presences are cleaned up.
 	// Does not ensure the match process itself is no longer running, that must be handled separately.
 	RemoveMatch(id uuid.UUID, stream PresenceStream)
-	// Get the label for a match.
-	GetMatchLabel(ctx context.Context, id uuid.UUID, node string) (string, error)
 	// Update the label entry for a given match.
 	UpdateMatchLabel(id uuid.UUID, label string) error
 	// List (and optionally filter) currently running matches.
@@ -89,7 +88,7 @@ type MatchRegistry interface {
 	Count() int
 
 	// Pass a user join attempt to a match handler. Returns if the match was found, if the join was accepted, if it's a new user for this match, a reason for any rejection, the match label, and the list of existing match participants.
-	JoinAttempt(ctx context.Context, id uuid.UUID, node string, userID, sessionID uuid.UUID, username, fromNode string, metadata map[string]string) (bool, bool, bool, string, string, []*MatchPresence)
+	JoinAttempt(ctx context.Context, id uuid.UUID, node string, userID, sessionID uuid.UUID, username string, sessionExpiry int64, vars map[string]string, clientIP, clientPort, fromNode string, metadata map[string]string) (bool, bool, bool, string, string, []*MatchPresence)
 	// Notify a match handler that one or more users have successfully joined the match.
 	// Expects that the caller has already determined the match is hosted on the current node.
 	Join(id uuid.UUID, presences []*MatchPresence)
@@ -104,11 +103,13 @@ type MatchRegistry interface {
 }
 
 type LocalMatchRegistry struct {
-	logger  *zap.Logger
-	config  Config
-	tracker Tracker
-	router  MessageRouter
-	node    string
+	logger          *zap.Logger
+	config          Config
+	sessionRegistry SessionRegistry
+	tracker         Tracker
+	router          MessageRouter
+	metrics         *Metrics
+	node            string
 
 	matches    *sync.Map
 	matchCount *atomic.Int64
@@ -118,7 +119,7 @@ type LocalMatchRegistry struct {
 	stoppedCh chan struct{}
 }
 
-func NewLocalMatchRegistry(logger, startupLogger *zap.Logger, config Config, tracker Tracker, router MessageRouter, node string) MatchRegistry {
+func NewLocalMatchRegistry(logger, startupLogger *zap.Logger, config Config, sessionRegistry SessionRegistry, tracker Tracker, router MessageRouter, metrics *Metrics, node string) MatchRegistry {
 	mapping := bleve.NewIndexMapping()
 	mapping.DefaultAnalyzer = keyword.Name
 
@@ -128,11 +129,13 @@ func NewLocalMatchRegistry(logger, startupLogger *zap.Logger, config Config, tra
 	}
 
 	return &LocalMatchRegistry{
-		logger:  logger,
-		config:  config,
-		tracker: tracker,
-		router:  router,
-		node:    node,
+		logger:          logger,
+		config:          config,
+		sessionRegistry: sessionRegistry,
+		tracker:         tracker,
+		router:          router,
+		metrics:         metrics,
+		node:            node,
 
 		matches:    &sync.Map{},
 		matchCount: atomic.NewInt64(0),
@@ -175,30 +178,65 @@ func (r *LocalMatchRegistry) NewMatch(logger *zap.Logger, id uuid.UUID, core Run
 		return nil, errors.New("shutdown in progress")
 	}
 
-	match, err := NewMatchHandler(logger, r.config, r, r.router, core, id, r.node, stopped, params)
+	match, err := NewMatchHandler(logger, r.config, r.sessionRegistry, r, r.router, core, id, r.node, stopped, params)
 	if err != nil {
 		return nil, err
 	}
 
 	r.matches.Store(id, match)
 	count := r.matchCount.Inc()
-	MetricsRuntimeMatchCount.M(count)
+	r.metrics.GaugeAuthoritativeMatches(float64(count))
 
 	return match, nil
 }
 
-func (r *LocalMatchRegistry) GetMatch(id uuid.UUID) *MatchHandler {
-	mh, ok := r.matches.Load(id)
-	if !ok {
-		return nil
+func (r *LocalMatchRegistry) GetMatch(ctx context.Context, id string) (*api.Match, error) {
+	// Validate the match ID.
+	idComponents := strings.SplitN(id, ".", 2)
+	if len(idComponents) != 2 {
+		return nil, ErrMatchIdInvalid
 	}
-	return mh.(*MatchHandler)
+	matchID, err := uuid.FromString(idComponents[0])
+	if err != nil {
+		return nil, ErrMatchIdInvalid
+	}
+
+	// Relayed match.
+	if idComponents[1] == "" {
+		size := r.tracker.CountByStream(PresenceStream{Mode: StreamModeMatchRelayed, Subject: matchID})
+		if size == 0 {
+			return nil, nil
+		}
+
+		return &api.Match{
+			MatchId: id,
+			Size:    int32(size),
+		}, nil
+	}
+
+	// Authoritative match.
+	if idComponents[1] != r.node {
+		return nil, nil
+	}
+
+	mh, ok := r.matches.Load(matchID)
+	if !ok {
+		return nil, nil
+	}
+	handler := mh.(*MatchHandler)
+
+	return &api.Match{
+		MatchId:       handler.IDStr,
+		Authoritative: true,
+		Label:         &wrappers.StringValue{Value: handler.Label()},
+		Size:          int32(handler.PresenceList.Size()),
+	}, nil
 }
 
 func (r *LocalMatchRegistry) RemoveMatch(id uuid.UUID, stream PresenceStream) {
 	r.matches.Delete(id)
 	matchesRemaining := r.matchCount.Dec()
-	MetricsRuntimeMatchCount.M(matchesRemaining)
+	r.metrics.GaugeAuthoritativeMatches(float64(matchesRemaining))
 
 	r.tracker.UntrackByStream(stream)
 	if err := r.index.Delete(fmt.Sprintf("%v.%v", id.String(), r.node)); err != nil {
@@ -214,20 +252,6 @@ func (r *LocalMatchRegistry) RemoveMatch(id uuid.UUID, stream PresenceStream) {
 			// Ignore if the signal has already been sent.
 		}
 	}
-}
-
-func (r *LocalMatchRegistry) GetMatchLabel(ctx context.Context, id uuid.UUID, node string) (string, error) {
-	if node != r.node {
-		// Match does not exist.
-		return "", nil
-	}
-
-	mh, ok := r.matches.Load(id)
-	if !ok {
-		// Match does not exist, or has already ended.
-		return "", nil
-	}
-	return mh.(*MatchHandler).Label(), nil
 }
 
 func (r *LocalMatchRegistry) UpdateMatchLabel(id uuid.UUID, label string) error {
@@ -432,9 +456,7 @@ func (r *LocalMatchRegistry) Stop(graceSeconds int) chan struct{} {
 	// Graceful shutdown not allowed/required, or grace period has expired.
 	if graceSeconds == 0 {
 		r.matches.Range(func(id, mh interface{}) bool {
-			mh.(*MatchHandler).Close()
-			r.matches.Delete(id)
-			// No need to clean up label index.
+			mh.(*MatchHandler).Stop()
 			return true
 		})
 		// Termination was triggered and there are no active matches.
@@ -471,7 +493,7 @@ func (r *LocalMatchRegistry) Count() int {
 	return int(r.matchCount.Load())
 }
 
-func (r *LocalMatchRegistry) JoinAttempt(ctx context.Context, id uuid.UUID, node string, userID, sessionID uuid.UUID, username, fromNode string, metadata map[string]string) (bool, bool, bool, string, string, []*MatchPresence) {
+func (r *LocalMatchRegistry) JoinAttempt(ctx context.Context, id uuid.UUID, node string, userID, sessionID uuid.UUID, username string, sessionExpiry int64, vars map[string]string, clientIP, clientPort, fromNode string, metadata map[string]string) (bool, bool, bool, string, string, []*MatchPresence) {
 	if node != r.node {
 		return false, false, false, "", "", nil
 	}
@@ -488,7 +510,7 @@ func (r *LocalMatchRegistry) JoinAttempt(ctx context.Context, id uuid.UUID, node
 	}
 
 	resultCh := make(chan *MatchJoinResult, 1)
-	if !mh.QueueJoinAttempt(ctx, resultCh, userID, sessionID, username, fromNode, metadata) {
+	if !mh.QueueJoinAttempt(ctx, resultCh, userID, sessionID, username, sessionExpiry, vars, clientIP, clientPort, fromNode, metadata) {
 		// The match call queue was full, so will be closed and therefore can't be joined.
 		return true, false, false, "Match is not currently accepting join requests", "", nil
 	}

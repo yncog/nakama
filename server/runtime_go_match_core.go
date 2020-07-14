@@ -56,7 +56,7 @@ type RuntimeGoMatchCore struct {
 
 func NewRuntimeGoMatchCore(logger *zap.Logger, matchRegistry MatchRegistry, router MessageRouter, id uuid.UUID, node string, stopped *atomic.Bool, db *sql.DB, env map[string]string, nk runtime.NakamaModule, match runtime.Match) (RuntimeMatchCore, error) {
 	ctx, ctxCancelFn := context.WithCancel(context.Background())
-	ctx = NewRuntimeGoContext(ctx, env, RuntimeExecutionModeMatch, nil, 0, "", "", nil, "", "", "")
+	ctx = NewRuntimeGoContext(ctx, node, env, RuntimeExecutionModeMatch, nil, 0, "", "", nil, "", "", "")
 	ctx = context.WithValue(ctx, runtime.RUNTIME_CTX_MATCH_ID, fmt.Sprintf("%v.%v", id.String(), node))
 	ctx = context.WithValue(ctx, runtime.RUNTIME_CTX_MATCH_NODE, node)
 
@@ -114,7 +114,7 @@ func (r *RuntimeGoMatchCore) MatchInit(presenceList *MatchPresenceList, deferMes
 	return state, tickRate, nil
 }
 
-func (r *RuntimeGoMatchCore) MatchJoinAttempt(tick int64, state interface{}, userID, sessionID uuid.UUID, username, node string, metadata map[string]string) (interface{}, bool, string, error) {
+func (r *RuntimeGoMatchCore) MatchJoinAttempt(tick int64, state interface{}, userID, sessionID uuid.UUID, username string, sessionExpiry int64, vars map[string]string, clientIP, clientPort, node string, metadata map[string]string) (interface{}, bool, string, error) {
 	presence := &MatchPresence{
 		Node:      node,
 		UserID:    userID,
@@ -122,7 +122,22 @@ func (r *RuntimeGoMatchCore) MatchJoinAttempt(tick int64, state interface{}, use
 		Username:  username,
 	}
 
-	newState, allow, reason := r.match.MatchJoinAttempt(r.ctx, r.runtimeLogger, r.db, r.nk, r, tick, state, presence, metadata)
+	// Prepare a temporary context that includes the user's session info on top of the base match context.
+	ctx := context.WithValue(r.ctx, runtime.RUNTIME_CTX_USER_ID, userID.String())
+	ctx = context.WithValue(ctx, runtime.RUNTIME_CTX_USERNAME, username)
+	if vars != nil {
+		ctx = context.WithValue(ctx, runtime.RUNTIME_CTX_VARS, vars)
+	}
+	ctx = context.WithValue(ctx, runtime.RUNTIME_CTX_USER_SESSION_EXP, sessionExpiry)
+	ctx = context.WithValue(ctx, runtime.RUNTIME_CTX_SESSION_ID, sessionID.String())
+	if clientIP != "" {
+		ctx = context.WithValue(ctx, runtime.RUNTIME_CTX_CLIENT_IP, clientIP)
+	}
+	if clientPort != "" {
+		ctx = context.WithValue(ctx, runtime.RUNTIME_CTX_CLIENT_PORT, clientPort)
+	}
+
+	newState, allow, reason := r.match.MatchJoinAttempt(ctx, r.runtimeLogger, r.db, r.nk, r, tick, state, presence, metadata)
 	return newState, allow, reason, nil
 }
 
