@@ -35,7 +35,7 @@ import (
 
 const (
 	RPCNotFoundErrorMessageTemplate = "RPC function not found: %s"
-	RPCNotFoundErrorTemplate        = `{"error":"RPC function not found","message":"%s","code":5}`
+	RPCNotFoundErrorTemplate        = `{"error":"%s","message":"%s","code":5}`
 )
 
 var (
@@ -119,7 +119,8 @@ func (s *ApiServer) RpcFuncHttp(w http.ResponseWriter, r *http.Request) {
 		// No function registered for this ID.
 		w.WriteHeader(http.StatusNotFound)
 		w.Header().Set("content-type", "application/json")
-		errData := []byte(fmt.Sprintf(RPCNotFoundErrorTemplate, fmt.Sprintf(RPCNotFoundErrorMessageTemplate, id)))
+		msg := fmt.Sprintf(RPCNotFoundErrorMessageTemplate, id)
+		errData := []byte(fmt.Sprintf(RPCNotFoundErrorTemplate, msg, msg))
 		_, err := w.Write(errData)
 		if err != nil {
 			s.logger.Debug("Error writing response to client", zap.Error(err))

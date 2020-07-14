@@ -55,7 +55,8 @@ func (s *ConsoleServer) httpRpcHandler(w http.ResponseWriter, r *http.Request) {
 		// No function registered for this ID.
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-		errData := []byte(fmt.Sprintf(RPCNotFoundErrorTemplate, fmt.Sprintf(RPCNotFoundErrorMessageTemplate, id)))
+		msg := fmt.Sprintf(RPCNotFoundErrorMessageTemplate, id)
+		errData := []byte(fmt.Sprintf(RPCNotFoundErrorTemplate, msg, msg))
 		_, err := w.Write(errData)
 		if err != nil {
 			s.logger.Debug("Error writing response to client", zap.Error(err))
