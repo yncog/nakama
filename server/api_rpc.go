@@ -120,6 +120,7 @@ func (s *ApiServer) RpcFuncHttp(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		w.Header().Set("content-type", "application/json")
 		msg := fmt.Sprintf(RPCNotFoundErrorMessageTemplate, id)
+		s.logger.Debug(msg)
 		errData := []byte(fmt.Sprintf(RPCNotFoundErrorTemplate, msg, msg))
 		_, err := w.Write(errData)
 		if err != nil {
@@ -178,6 +179,7 @@ func (s *ApiServer) RpcFuncHttp(w http.ResponseWriter, r *http.Request) {
 
 	// Execute the function.
 	result, fnErr, code := fn(r.Context(), queryParams, uid, username, vars, expiry, "", clientIP, clientPort, payload)
+
 	if fnErr != nil {
 		response, _ := json.Marshal(map[string]interface{}{"error": fnErr, "message": fnErr.Error(), "code": code})
 		w.WriteHeader(runtime.HTTPStatusFromCode(code))
@@ -186,8 +188,13 @@ func (s *ApiServer) RpcFuncHttp(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			s.logger.Debug("Error writing response to client", zap.Error(err))
 		}
+
+		s.logger.Debug(fmt.Sprintf("[%s] Executed RPC HTTP: %s", username, id), zap.String("payload", payload), zap.String("error", fnErr.Error()))
+
 		return
 	}
+
+	s.logger.Debug(fmt.Sprintf("[%s] Executed RPC HTTP: %s", username, id), zap.String("payload", payload), zap.String("response", result))
 
 	// Return the successful result.
 	var response []byte
