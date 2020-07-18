@@ -655,7 +655,7 @@ func NewRuntimeConfig() *RuntimeConfig {
 		RegistrySize:      512,
 		EventQueueSize:    65536,
 		EventQueueWorkers: 8,
-		ReadOnlyGlobals:   true,
+		ReadOnlyGlobals:   false,
 	}
 }
 
