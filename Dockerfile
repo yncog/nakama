@@ -15,7 +15,7 @@
 # docker build "$PWD" --build-arg commit="$(git rev-parse --short HEAD)" --build-arg version=v2.1.1 -t heroiclabs/nakama:2.1.1
 # docker build "$PWD" --build-arg commit="$(git rev-parse --short HEAD)" --build-arg version="v2.1.1-$(git rev-parse --short HEAD)" -t heroiclabs/nakama-prerelease:"2.1.1-$(git rev-parse --short HEAD)"
 
-FROM golang:1.13.8-buster as builder
+FROM golang:1.14.3-buster as builder
 
 ARG commit
 ARG version
@@ -34,7 +34,7 @@ COPY . /go/build/nakama
 RUN go build -o /go/build-out/nakama -trimpath -mod=vendor -gcflags "-trimpath $PWD" -asmflags "-trimpath $PWD" -ldflags "-s -w -X main.version=$version -X main.commitID=$commit"
 
 FROM debian:buster-slim
-    
+
 LABEL variant=nakama
 LABEL description="Distributed server for social and realtime games and apps."
 
@@ -52,4 +52,4 @@ EXPOSE 7349 7350 7351
 ENTRYPOINT ["tini", "--", "/nakama/nakama"]
 
 HEALTHCHECK --interval=5m --timeout=10s \
-  CMD curl -f http://localhost:7350/ || exit 1
+CMD curl -f http://localhost:7350/ || exit 1
