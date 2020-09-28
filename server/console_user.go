@@ -17,6 +17,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/gofrs/uuid"
 	"github.com/golang/protobuf/ptypes/empty"
@@ -74,6 +75,7 @@ func (s *ConsoleServer) DeleteUsers(ctx context.Context, in *empty.Empty) (*empt
 }
 
 func (s *ConsoleServer) ListUsers(ctx context.Context, in *console.ListUsersRequest) (*console.UserList, error) {
+	const PAGE_SIZE = 50
 	// Searching only through tombstone records.
 	if in.Tombstones {
 		var userID *uuid.UUID
@@ -113,9 +115,14 @@ func (s *ConsoleServer) ListUsers(ctx context.Context, in *console.ListUsersRequ
 			}, nil
 		}
 
-		query := "SELECT user_id, create_time FROM user_tombstone LIMIT 50"
+		query := fmt.Sprintf("SELECT user_id, create_time FROM user_tombstone LIMIT %d", PAGE_SIZE)
+		var params []interface{}
+		if in.Page > 0 {
+			query += " OFFSET $1"
+			params = []interface{}{in.Page * PAGE_SIZE}
+		}
 
-		rows, err := s.db.QueryContext(ctx, query)
+		rows, err := s.db.QueryContext(ctx, query, params...)
 		if err != nil {
 			s.logger.Error("Error querying user tombstones.", zap.Any("in", in), zap.Error(err))
 			return nil, status.Error(codes.Internal, "An error occurred while trying to list users.")
@@ -147,12 +154,16 @@ func (s *ConsoleServer) ListUsers(ctx context.Context, in *console.ListUsersRequ
 
 	if in.Filter != "" {
 		_, err := uuid.FromString(in.Filter)
-		// If the filter is not a valid user ID treat it as a username instead.
+		// If the filter is not a valid user ID treat it as a username or display name instead.
 
 		var query string
 		params := []interface{}{in.Filter}
 		if err != nil {
-			query = "SELECT id, username, display_name, avatar_url, lang_tag, location, timezone, metadata, facebook_id, facebook_instant_game_id, google_id, gamecenter_id, steam_id, edge_count, create_time, update_time FROM users WHERE username = $1"
+			query = fmt.Sprintf("SELECT id, username, display_name, avatar_url, lang_tag, location, timezone, metadata, facebook_id, facebook_instant_game_id, google_id, gamecenter_id, steam_id, edge_count, create_time, update_time FROM users WHERE (username = $1 or display_name = $1) LIMIT %d", PAGE_SIZE)
+			if in.Page > 0 {
+				query += " OFFSET $1"
+				params = append(params, in.Page*PAGE_SIZE)
+			}
 		} else {
 			query = "SELECT id, username, display_name, avatar_url, lang_tag, location, timezone, metadata, facebook_id, facebook_instant_game_id, google_id, gamecenter_id, steam_id, edge_count, create_time, update_time FROM users WHERE id = $1"
 		}
@@ -189,12 +200,19 @@ func (s *ConsoleServer) ListUsers(ctx context.Context, in *console.ListUsersRequ
 	var query string
 
 	if in.Banned {
-		query = "SELECT id, username, display_name, avatar_url, lang_tag, location, timezone, metadata, facebook_id, facebook_instant_game_id, google_id, gamecenter_id, steam_id, edge_count, create_time, update_time FROM users WHERE disable_time <> '1970-01-01 00:00:00 UTC' LIMIT 50"
+		query = "SELECT id, username, display_name, avatar_url, lang_tag, location, timezone, metadata, facebook_id, facebook_instant_game_id, google_id, gamecenter_id, steam_id, edge_count, create_time, update_time FROM users WHERE disable_time <> '1970-01-01 00:00:00 UTC' LIMIT %d"
 	} else {
-		query = "SELECT id, username, display_name, avatar_url, lang_tag, location, timezone, metadata, facebook_id, facebook_instant_game_id, google_id, gamecenter_id, steam_id, edge_count, create_time, update_time FROM users LIMIT 50"
+		query = "SELECT id, username, display_name, avatar_url, lang_tag, location, timezone, metadata, facebook_id, facebook_instant_game_id, google_id, gamecenter_id, steam_id, edge_count, create_time, update_time FROM users LIMIT %d"
+	}
+	query = fmt.Sprintf(query, PAGE_SIZE)
+
+	var params []interface{}
+	if in.Page > 0 {
+		query += " OFFSET $1"
+		params = []interface{}{in.Page * PAGE_SIZE}
 	}
 
-	rows, err := s.db.QueryContext(ctx, query)
+	rows, err := s.db.QueryContext(ctx, query, params...)
 	if err != nil {
 		s.logger.Error("Error querying users.", zap.Any("in", in), zap.Error(err))
 		return nil, status.Error(codes.Internal, "An error occurred while trying to list users.")

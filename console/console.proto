@@ -369,6 +369,8 @@ message ListUsersRequest {
   bool banned = 2;
   // Search only recorded deletes.
   bool tombstones = 3;
+  // Pagination offset
+  int32 page = 4;
 }
 
 // List of storage objects.
@@ -423,6 +425,7 @@ message UserList {
   repeated nakama.api.User users = 1;
   // Approximate total number of users.
   int32 total_count = 2;
+  int32 page = 3;
 }
 
 // List of nodes and their stats.
