@@ -1,15 +1,15 @@
-import React, {Component} from 'react';
-import {RouteComponentProps} from 'react-router';
+import React, { Component } from 'react';
+import { RouteComponentProps } from 'react-router';
 import queryString from 'query-string';
 
-import {Dispatch} from 'redux';
-import {connect} from 'react-redux';
-import {ApplicationState, ConnectedReduxProps} from '../../store';
+import { Dispatch } from 'redux';
+import { connect } from 'react-redux';
+import { ApplicationState, ConnectedReduxProps } from '../../store';
 import * as userActions from '../../store/users/actions';
-import {UserObject, UserObjectRequest, UsersObject, UsersObjectRequest} from '../../store/users/types';
+import { UserObject, UserObjectRequest, UsersObject, UsersObjectRequest } from '../../store/users/types';
 
-import {Button, Column, Control, Field, Generic, Icon, Input, Level, Section, Table, Title} from 'rbx';
-import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
+import { Button, Column, Control, Field, Generic, Icon, Input, Level, Section, Table, Title } from 'rbx';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 import Header from '../../components/header';
 import Sidebar from '../../components/sidebar';
@@ -31,13 +31,14 @@ type Props = RouteComponentProps & PropsFromState & PropsFromDispatch & Connecte
 type State = {
   filter: string,
   banned: boolean,
-  tombstones: boolean
+  tombstones: boolean,
+  page: number
 };
 
 class Users extends Component<Props, State> {
   public constructor(props: Props) {
     super(props);
-    this.state = {filter: '', banned: false, tombstones: false};
+    this.state = { filter: '', banned: false, tombstones: false, page: 0 };
   }
 
   public componentDidMount() {
@@ -45,70 +46,108 @@ class Users extends Component<Props, State> {
     if (query.filter) {
       (document.getElementById('filter') as HTMLInputElement).value = query.filter as string;
     }
+    const queryPage: number = parseInt(query.page as string || '0') || 0;
     this.setState({
       filter: query.filter as string || '',
       banned: !!query.banned,
-      tombstones: !!query.tombstones
+      tombstones: !!query.tombstones,
+      page: queryPage
     });
     this.props.fetchManyRequest({
       filter: query.filter as string || '',
       banned: !!query.banned,
-      tombstones: !!query.tombstones
+      tombstones: !!query.tombstones,
+      page: queryPage
     });
   }
 
   public all() {
     this.setState({
       banned: false,
-      tombstones: false
+      tombstones: false,
+      page: 0
     });
     this.props.fetchManyRequest({
       filter: this.state.filter,
       banned: false,
-      tombstones: false
+      tombstones: false,
+      page: 0
     });
   }
 
   public banned() {
     this.setState({
       banned: true,
-      tombstones: false
+      tombstones: false,
+      page: 0
     });
     this.props.fetchManyRequest({
       filter: this.state.filter,
       banned: true,
-      tombstones: false
+      tombstones: false,
+      page: 0
     });
   }
 
   public tombstones() {
     this.setState({
       banned: false,
-      tombstones: true
+      tombstones: true,
+      page: 0
     });
     this.props.fetchManyRequest({
       filter: this.state.filter,
       banned: false,
-      tombstones: true
+      tombstones: true,
+      page: 0
     });
   }
 
   public filter() {
-    const {history} = this.props;
+    const { history } = this.props;
     const filter = (document.getElementById('filter') as HTMLInputElement).value;
-    history.push(`/users?filter=${filter}`);
-    this.setState({filter});
-    this.props.fetchManyRequest({filter});
+    history.push(`/users?filter=${filter}&tombstones=${this.state.tombstones}&banned=${this.state.banned}`);
+    this.setState({ filter, page: 0 });
+    this.props.fetchManyRequest({
+      filter,
+      tombstones: this.state.tombstones,
+      banned: this.state.banned,
+      page: 0
+    });
   }
 
   public details(id: string) {
-    const {history} = this.props;
+    const { history } = this.props;
     history.push(`/users/${id}`);
   }
 
-  public remove_all() {
-    if (confirm('Are you sure you want to delete all users?')) {
-      this.props.deleteManyRequest(this.state);
+  public next_page() {
+    const newPage = this.state.page + 1;
+    if (newPage >= 0) {
+      const { history } = this.props;
+      history.push(`/users?filter=${this.state.filter}&tombstones=${this.state.tombstones}&banned=${this.state.banned}&page=${newPage}`);
+      this.setState({ page: newPage });
+      this.props.fetchManyRequest({
+        filter: this.state.filter,
+        tombstones: this.state.tombstones,
+        banned: this.state.banned,
+        page: newPage
+      });
+    }
+  }
+
+  public prev_page() {
+    const newPage = this.state.page - 1;
+    if (newPage >= 0) {
+      const { history } = this.props;
+      history.push(`/users?filter=${this.state.filter}&tombstones=${this.state.tombstones}&banned=${this.state.banned}&page=${newPage}`);
+      this.setState({ page: newPage });
+      this.props.fetchManyRequest({
+        filter: this.state.filter,
+        tombstones: this.state.tombstones,
+        banned: this.state.banned,
+        page: newPage
+      });
     }
   }
 
@@ -121,13 +160,13 @@ class Users extends Component<Props, State> {
   }
 
   public render() {
-    const {banned, tombstones} = this.state;
-    const {data} = this.props;
+    const { banned, tombstones } = this.state;
+    const { data } = this.props;
     return <Generic id="users">
-      <Header/>
+      <Header />
       <Section>
         <Column.Group>
-          <Sidebar active="users"/>
+          <Sidebar active="users" />
 
           <Column>
             <Level>
@@ -141,7 +180,7 @@ class Users extends Component<Props, State> {
                 <Level.Item>
                   <Field kind="addons">
                     <Control>
-                      <Input id="filter" type="text" placeholder="Find a user"/>
+                      <Input id="filter" type="text" placeholder="Find a user" />
                     </Control>
                     <Control>
                       <Button onClick={this.filter.bind(this)}>Lookup</Button>
@@ -167,25 +206,41 @@ class Users extends Component<Props, State> {
               </Level.Item>
 
               <Level.Item align="right">
-                <Level.Item>
-                  <Button onClick={this.remove_all.bind(this)}>
-                    <Icon>
-                      <FontAwesomeIcon icon="trash"/>
-                    </Icon>
-                    <span>Delete All</span>
-                  </Button>
-                </Level.Item>
+                {
+                  (this.state.page > 0) ?
+                    <Level.Item>
+                      <Button onClick={this.prev_page.bind(this)}>
+                        <Icon>
+                          <FontAwesomeIcon icon="chevron-left" />
+                        </Icon>
+                        <span>Prev</span>
+                      </Button>
+                    </Level.Item>
+                    : null
+                }
+                {
+                  data.users && data.users.length >= 50 ?
+                    <Level.Item>
+                      <Button onClick={this.next_page.bind(this)}>
+                        <span>Next</span>
+                        <Icon>
+                          <FontAwesomeIcon icon="chevron-right" />
+                        </Icon>
+                      </Button>
+                    </Level.Item>
+                    : null
+                }
               </Level.Item>
             </Level>
 
             <Table fullwidth striped hoverable>
               <Table.Head>
                 <Table.Row>
-                  <Table.Heading style={{width: '35%'}}>ID</Table.Heading>
-                  <Table.Heading style={{width: '17.5%'}} hidden={tombstones}>Username</Table.Heading>
-                  <Table.Heading style={{width: '17.5%'}} hidden={tombstones}>Display Name</Table.Heading>
-                  <Table.Heading style={{width: '20%'}}>Update Time</Table.Heading>
-                  <Table.Heading style={{width: '10%'}}>&nbsp;</Table.Heading>
+                  <Table.Heading style={{ width: '35%' }}>ID</Table.Heading>
+                  <Table.Heading style={{ width: '17.5%' }} hidden={tombstones}>Username</Table.Heading>
+                  <Table.Heading style={{ width: '17.5%' }} hidden={tombstones}>Display Name</Table.Heading>
+                  <Table.Heading style={{ width: '20%' }}>Update Time</Table.Heading>
+                  <Table.Heading style={{ width: '10%' }}>&nbsp;</Table.Heading>
                 </Table.Row>
               </Table.Head>
               <Table.Body>
@@ -223,7 +278,7 @@ class Users extends Component<Props, State> {
   }
 }
 
-const mapStateToProps = ({user}: ApplicationState) => ({
+const mapStateToProps = ({ user }: ApplicationState) => ({
   loading: user.loading,
   errors: user.errors,
   data: user.data

@@ -56,7 +56,8 @@ function* handleFetchMany({payload: data}: AnyAction)
       window.nakama_api.listUsers,
       data && data.filter,
       data && data.banned,
-      data && data.tombstones
+      data && data.tombstones,
+      data && data.page
     );
     if(res.error)
     {

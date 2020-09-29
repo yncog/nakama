@@ -161,7 +161,7 @@ func (s *ConsoleServer) ListUsers(ctx context.Context, in *console.ListUsersRequ
 		if err != nil {
 			query = fmt.Sprintf("SELECT id, username, display_name, avatar_url, lang_tag, location, timezone, metadata, facebook_id, facebook_instant_game_id, google_id, gamecenter_id, steam_id, edge_count, create_time, update_time FROM users WHERE (username = $1 or display_name = $1) LIMIT %d", PAGE_SIZE)
 			if in.Page > 0 {
-				query += " OFFSET $1"
+				query += " OFFSET $2"
 				params = append(params, in.Page*PAGE_SIZE)
 			}
 		} else {
