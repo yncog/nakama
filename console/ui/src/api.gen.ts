@@ -274,7 +274,7 @@ export interface ConsoleAuthenticateRequest {
 export interface ConsoleConfig {
   // JSON-encoded active server configuration.
   config?: string;
-  // 
+  //
   server_version?: string;
   // Any warnings about the current config.
   warnings?: Array<ConfigWarning>;
@@ -307,6 +307,8 @@ export interface ConsoleUnlinkDeviceRequest {
 export interface ConsoleUserList {
   // Approximate total number of users.
   total_count?: number;
+  // The page returned
+  page?: number;
   // A list of users.
   users?: Array<ApiUser>;
 }
@@ -952,13 +954,14 @@ export const NakamaApi = (configuration: ConfigurationParameters = {
       return napi.doFetch(urlPath, "DELETE", queryParams, _body, options)
     },
     /** List (and optionally filter) users. */
-    listUsers(filter?: string, banned?: boolean, tombstones?: boolean, options: any = {}): Promise<ConsoleUserList> {
+    listUsers(filter?: string, banned?: boolean, tombstones?: boolean, page?: number, options: any = {}): Promise<ConsoleUserList> {
       const urlPath = "/v2/console/user";
 
       const queryParams = {
         filter: filter,
         banned: banned,
         tombstones: tombstones,
+        page: page
       } as any;
 
       let _body = null;

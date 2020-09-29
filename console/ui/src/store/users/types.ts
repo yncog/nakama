@@ -44,7 +44,8 @@ export interface UserObjectRequest
   recorded?: boolean,
   filter?: string,
   banned?: boolean,
-  tombstones?: boolean
+  tombstones?: boolean,
+  page?: number
 };
 
 export interface UserUnlinkDeviceRequest
@@ -83,7 +84,8 @@ export interface UsersObjectRequest
 {
   filter?: string,
   banned?: boolean,
-  tombstones?: boolean
+  tombstones?: boolean,
+  page?: number
 };
 
 export interface UsersObject
