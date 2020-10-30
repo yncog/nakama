@@ -1093,6 +1093,7 @@ func openLuaModules(logger *zap.Logger, rootPath string, paths []string) (*Runti
 		lua.OsLibName:     OpenOs,
 		lua.StringLibName: lua.OpenString,
 		lua.MathLibName:   lua.OpenMath,
+		lua.DebugLibName:  lua.OpenDebug,
 		Bit32LibName:      OpenBit32,
 	}
 
